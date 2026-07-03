@@ -6,7 +6,7 @@ CREATE TABLE bookings (
     duration_hours INTEGER NOT NULL,
     total_price   INTEGER,
     status        VARCHAR(50) NOT NULL DEFAULT 'PENDING',
-    payment_status VARCHAR(50) NOT NULL DEFAULT 'UNPAID',
+    payment_status VARCHAR(50) NOT NULL DEFAULT 'BOOKED',
     notes         TEXT,
     created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMP NOT NULL DEFAULT NOW()

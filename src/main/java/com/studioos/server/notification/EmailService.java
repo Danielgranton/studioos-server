@@ -15,6 +15,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    // ─── Send OTP (hardcoded template) ───
     @Async
     public void sendOtp(String to, String otp) {
         try {
@@ -33,6 +34,21 @@ public class EmailService {
             log.info("OTP email sent to: {}", to);
         } catch (Exception e) {
             log.error("Failed to send OTP email to {}: {}", to, e.getMessage());
+        }
+    }
+
+    // ─── Send general notification ───
+    @Async
+    public void sendNotification(String to, String subject, String body) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(to);
+            message.setSubject(subject);
+            message.setText(body);
+            mailSender.send(message);
+            log.info("Notification email sent to: {}", to);
+        } catch (Exception e) {
+            log.error("Failed to send notification email to {}: {}", to, e.getMessage());
         }
     }
 }
