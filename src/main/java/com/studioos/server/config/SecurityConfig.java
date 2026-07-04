@@ -18,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import com.studioos.server.auth.InternalServiceAuthFilter;
 import com.studioos.server.auth.JwtAuthFilter;
 import com.studioos.server.shared.enums.Role;
 
@@ -30,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final InternalServiceAuthFilter internalServiceAuthFilter;
     private final UserDetailsService userDetailsService;
 
     @Bean
@@ -45,6 +47,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/beats/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/studios/**").permitAll()
 
+                        // ─── Internal service-to-service endpoints ───
+                        // Auth handled entirely by InternalServiceAuthFilter (API key), not JWT.
+                        // permitAll() here just means "Spring Security's authorizeHttpRequests
+                        // won't block it" — InternalServiceAuthFilter still rejects bad/missing keys.
+                        .requestMatchers("/internal/**").permitAll()
+
                         // ─── Admin only ───
                         .requestMatchers("/admin/**").hasRole(Role.SUPER_ADMIN.name())
 
@@ -52,7 +60,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(internalServiceAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(jwtAuthFilter, InternalServiceAuthFilter.class);
 
         return http.build();
     }

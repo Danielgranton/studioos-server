@@ -81,6 +81,10 @@ jwt:
   expiration: ${JWT_EXPIRATION:86400000}        # 24 hours in ms
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}  # 7 days in ms
 
+internal:
+  service:
+    api-key: ${INTERNAL_SERVICE_API_KEY}
+    
 # ─── MPESA (Daraja API) ───
 mpesa:
   base-url: ${MPESA_BASE_URL:https://sandbox.safaricom.co.ke}

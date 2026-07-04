@@ -5,44 +5,12 @@ StudioOS is a Kenyan music production marketplace platform that connects **produ
 This repository (`studioos-server`) is a **Spring Boot monolith** — a deliberate rewrite from an earlier microservices architecture. Where the old design used inter-service events, this monolith uses internal `ApplicationEventPublisher` / `@EventListener` patterns to keep module boundaries clean without the operational overhead of separate services.
 
 ---
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Language / Runtime | Java 21, Spring Boot 3.5.16 |
-| Web | Spring Web (REST), Spring WebFlux (for M-Pesa HTTP calls via WebClient) |
-| Realtime | Spring WebSocket (chat, calls, notifications) |
-| Persistence | Spring Data JPA + Hibernate, PostgreSQL |
-| Migrations | Flyway |
-| Auth | Spring Security + JWT (`io.jsonwebtoken` / jjwt) |
-| Payments | M-Pesa STK Push (inbound), M-Pesa B2C (withdrawals) |
-| Build | Maven (`./mvnw`) |
-| Dev Env | Kali Linux, zsh |
-
----
-
-## Project Structure
-
-Base package: `com.studioos.server`
-
-```
-com.studioos.server
-├── auth/               # JWT filters, authentication
-├── shared/
-│   └── enums/          # Shared domain enums (see below)
-├── user/                # User profiles
-├── studio/              # Studio listings
-├── booking/              # Studio booking lifecycle
-├── payment/               # Transactions, wallets, escrow, withdrawals
-└── notification/           # Email + SMS + in-app notifications
-```
-
 ---
 
 ## Module Status
 
 | Module | Status | Notes |
+
 |---|---|---|
 | Auth & core infra | Done | |
 | User Profile | Done | Profile images stored as URL strings; AWS S3 upload deferred |
@@ -55,50 +23,7 @@ com.studioos.server
 
 ---
 
-## Domain Enums
-
-Enum discipline matters here — always verify against `shared/enums` before writing new code, since names/values have shifted during development.
-
-```
-TransactionStatus       PENDING, SUCCESS, FAILED
-TransactionType          DEPOSIT, BOOKING_PAYMENT, BEAT_PURCHASE, COMMISSION, WITHDRAWAL, REFUND
-WithdrawalStatus         PENDING, APPROVED, REJECTED, COMPLETED
-EscrowStatus              HELD, RELEASED, REFUNDED
-BookingStatus              PENDING, APPROVED, RECORDING, MIXING, READY, DELIVERED, CANCELLED
-BookingPaymentStatus        BOOKED, PAID
-BeatPaymentStatus            PENDING, PAID, FAILED
-AuditEventType                 Transaction, wallet, escrow, and top-up audit events
-```
-
 ---
-
-## Payment Module (Architecture Summary)
-
-The Payment module is built around five core entities:
-
-- **Transaction** — the ledger record for every money movement (deposit, booking payment, beat purchase, commission, withdrawal, refund). Tracks M-Pesa identifiers: `mpesaCheckoutRequestId`, `mpesaMerchantRequestId`, `mpesaReceiptNumber`, `mpesaPhoneNumber`.
-- **Wallet** — producer/studio balance, split into `availableBalance`, `pendingBalance`, and `withdrawnBalance`.
-- **Escrow** — holds booking funds until the booking reaches `DELIVERED` (release) or `CANCELLED` (refund).
-- **Withdrawal** — producer payout requests, settled via M-Pesa B2C.
-- **AuditLog** — immutable record of transaction, wallet, escrow, and top-up events.
-
-**Booking payment flow:**
-
-```
-Client initiates M-Pesa STK Push
-        │
-        ▼
-Transaction (PENDING) created
-        │
-        ▼
-M-Pesa callback → SUCCESS / FAILED
-        │
-        ▼
-On SUCCESS → funds held in Escrow (HELD)
-        │
-        ├── Booking reaches DELIVERED → Escrow RELEASED → Wallet credited
-        └── Booking CANCELLED           → Escrow REFUNDED → client refunded
-```
 
 Commission is calculated as a **rate lookup**, not a hardcoded enum, so rates can vary (e.g. by studio tier) without a code change.
 
@@ -113,22 +38,6 @@ Beat purchases follow a separate, simpler flow tracked via `BeatPaymentStatus` r
 - Java 21
 - PostgreSQL (local instance, e.g. `sosdb`)
 - Maven wrapper (bundled — no separate Maven install needed)
-
-### Environment Variables
-
-Copy `.env.example` to `.env` and fill in real values. **Never commit `.env`.**
-
-```
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=sosdb
-DB_USER=postgres
-DB_PASSWORD=your_local_password
-
-MPESA_PASSKEY=your_mpesa_passkey
-MPESA_ENVIRONMENT=sandbox
-# MPESA_INITIATOR_PASSWORD=...
-```
 
 ### Running the server
 
