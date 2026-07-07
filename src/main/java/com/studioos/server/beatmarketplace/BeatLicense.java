@@ -44,7 +44,7 @@ public class BeatLicense {
     @Column(nullable = false)
     private Integer price;
 
-    @Builder.Default
+    @Builder.Default 
     private Boolean commercialUse = false;
 
     private Integer maxStreams;
@@ -55,6 +55,7 @@ public class BeatLicense {
     @Builder.Default
     private Boolean allowRadio = false;
 
+    @Column(name = "allow_tv")
     @Builder.Default
     private Boolean allowTV = false;
 

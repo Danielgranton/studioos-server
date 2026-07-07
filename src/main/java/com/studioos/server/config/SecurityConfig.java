@@ -44,13 +44,13 @@ public class SecurityConfig {
                         // ─── Public endpoints ───
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/beats/*/download").authenticated()
+
                         .requestMatchers(HttpMethod.GET, "/beats/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/studios/**").permitAll()
 
                         // ─── Internal service-to-service endpoints ───
-                        // Auth handled entirely by InternalServiceAuthFilter (API key), not JWT.
-                        // permitAll() here just means "Spring Security's authorizeHttpRequests
-                        // won't block it" — InternalServiceAuthFilter still rejects bad/missing keys.
                         .requestMatchers("/internal/**").permitAll()
 
                         // ─── Admin only ───

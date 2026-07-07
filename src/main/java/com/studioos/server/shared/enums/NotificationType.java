@@ -3,6 +3,8 @@ package com.studioos.server.shared.enums;
 public enum NotificationType {
     NEW_MESSAGE,
     BEAT_SHARED,
+    BEAT_SOLD,
+    BEAT_PURCHASED,
     BOOKING_REQUEST,
     PAYMENT_REQUEST,
     PROJECT_UPDATE,

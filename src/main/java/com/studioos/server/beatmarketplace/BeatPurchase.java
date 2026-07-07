@@ -74,6 +74,10 @@ public class BeatPurchase {
     private BeatPaymentStatus status;
 
     @Builder.Default
+    @Column(name = "is_exclusive", nullable = false)
+    private Boolean isExclusive = false;
+
+    @Builder.Default
     private Integer downloadCount = 0;
 
     @CreatedDate

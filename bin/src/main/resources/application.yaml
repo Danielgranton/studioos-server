@@ -1,0 +1,149 @@
+spring:
+  application:
+    name: studioos-server
+
+  # ─── DATABASE ───
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:studioos}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # ─── EMAIL (SMTP) ───
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+# ─── ASYNC (for email/sms sending) ───
+  task:
+    execution:
+      pool:
+        core-size: 5
+        max-size: 10
+
+  # ─── JPA ───
+  jpa:
+    hibernate:
+      ddl-auto: validate        # Flyway handles schema, Hibernate just validates
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  # ─── FLYWAY ───
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+  # ─── WEBSOCKET ───
+  websocket:
+    path: /ws
+
+  # ─── JACKSON ───
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+# ─── SERVER ───
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /api
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# ─── JWT ───
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}        # 24 hours in ms
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}  # 7 days in ms
+
+internal:
+  service:
+    api-key: ${INTERNAL_SERVICE_API_KEY}
+    
+# ─── MPESA (Daraja API) ───
+mpesa:
+  base-url: ${MPESA_BASE_URL:https://sandbox.safaricom.co.ke}
+  consumer-key: ${MPESA_CONSUMER_KEY}
+  consumer-secret: ${MPESA_CONSUMER_SECRET}
+  shortcode: ${MPESA_SHORTCODE}
+  passkey: ${MPESA_PASSKEY}
+  callback-url: ${MPESA_CALLBACK_URL}
+  timeout-url: ${MPESA_TIMEOUT_URL}
+
+
+# ─── PLATFORM ───
+platform:
+  commission-rate: ${COMMISSION_RATE:0.10}      # 10% default
+  currency: KES
+  mixing-deadline-days: 7
+
+# ─── ACTUATOR ───
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# ─── LOGGING ───
+logging:
+  level:
+    com.studioos: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+---
+# ─── DEV PROFILE ───
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    show-sql: true
+  logging:
+    level:
+      com.studioos: DEBUG
+      org.hibernate.SQL: DEBUG
+      org.hibernate.type.descriptor.sql: TRACE
+
+---
+# ─── PROD PROFILE ───
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    show-sql: false
+  logging:
+    level:
+      com.studioos: INFO
+      org.springframework.security: WARN

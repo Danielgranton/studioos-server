@@ -6,6 +6,8 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import static com.studioos.server.beatmarketplace.BeatStorageConstants.BEAT_UPLOAD_PREFIX;
+import static com.studioos.server.beatmarketplace.BeatStorageConstants.MEDIA_BUCKET;
 import com.studioos.server.beatmarketplace.dto.BeatUploadCompleteResponse;
 import com.studioos.server.beatmarketplace.dto.BeatUploadSessionResponse;
 import com.studioos.server.beatmarketplace.dto.CreateBeatRequest;
@@ -27,8 +29,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class BeatService {
 
-    private static final String MEDIA_BUCKET = "studioos-media";
-    private static final String BEAT_UPLOAD_PREFIX = "beats/uploads";
     private static final int UPLOAD_URL_EXPIRY_SECONDS = 900; // 15 minutes
 
     private final BeatRepository beatRepository;

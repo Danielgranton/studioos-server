@@ -10,6 +10,7 @@ import com.studioos.server.shared.enums.AuditEventType;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.TransactionStatus;
 import com.studioos.server.shared.enums.TransactionType;
+import com.studioos.server.shared.events.TransactionResolvedEvent;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,13 +23,8 @@ public class PaymentService {
     private final AuditLogRepository auditLogRepository;
     private final EscrowService escrowService;
     private final MpesaService mpesaService;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
-    /**
-     * Step 1: Client initiates payment for a booking. Creates a PENDING transaction
-     * and triggers the M-Pesa STK Push. Stores the checkoutRequestId returned by
-     * Safaricom so the later callback (Step 2) can be matched back to this transaction.
-     * Does NOT touch escrow yet — that only happens once the callback confirms success.
-     */
     @Transactional
     public Transaction initiateBookingPayment(String bookingId, String phoneNumber) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -72,13 +68,7 @@ public class PaymentService {
         return transaction;
     }
 
-    /**
-     * Step 2: M-Pesa callback confirms the payment result. Looked up by checkoutRequestId
-     * since that's the only identifier Safaricom's callback payload carries — not our
-     * internal transaction ID. On success, marks the transaction SUCCESS, moves the
-     * booking to PAID, and hands off to EscrowService to hold the funds.
-     */
-    @Transactional
+     @Transactional
     public Transaction handleMpesaCallback(String checkoutRequestId, boolean success, String mpesaReceiptNumber) {
         Transaction transaction = transactionRepository.findByMpesaCheckoutRequestId(checkoutRequestId)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -91,19 +81,27 @@ public class PaymentService {
 
         if (!success) {
             transaction.setStatus(TransactionStatus.FAILED);
-            return transactionRepository.save(transaction);
+            transactionRepository.save(transaction);
+            eventPublisher.publishEvent(
+                    new TransactionResolvedEvent(transaction.getId(), transaction.getType(), false));
+            return transaction;
         }
 
         transaction.setStatus(TransactionStatus.SUCCESS);
         transaction.setMpesaReceiptNumber(mpesaReceiptNumber);
         transactionRepository.save(transaction);
 
-        Booking booking = bookingRepository.findById(transaction.getBookingId())
-                .orElseThrow(() -> new IllegalStateException("Booking not found for transaction " + transaction.getId()));
-        booking.setPaymentStatus(BookingPaymentStatus.PAID);
-        bookingRepository.save(booking);
+        if (transaction.getType() == TransactionType.BOOKING_PAYMENT) {
+            Booking booking = bookingRepository.findById(transaction.getBookingId())
+                    .orElseThrow(() -> new IllegalStateException("Booking not found for transaction " + transaction.getId()));
+            booking.setPaymentStatus(BookingPaymentStatus.PAID);
+            bookingRepository.save(booking);
 
-        escrowService.holdEscrow(booking, transaction);
+            escrowService.holdEscrow(booking, transaction);
+        }
+
+        eventPublisher.publishEvent(
+                new TransactionResolvedEvent(transaction.getId(), transaction.getType(), true));
 
         return transaction;
     }
@@ -118,5 +116,38 @@ public class PaymentService {
                         .description(description)
                         .build()
         );
+    }
+
+    @Transactional
+    public Transaction initiateBeatPurchasePayment(Integer buyerId, String studioId, Integer amount,
+                                                    String phoneNumber, String description) {
+
+        Transaction transaction = transactionRepository.save(
+                Transaction.builder()
+                    .type(TransactionType.BEAT_PURCHASE)
+                    .status(TransactionStatus.PENDING)
+                    .amount(amount)
+                    .studioId(studioId)
+                    .userId(buyerId)
+                    .mpesaPhoneNumber(phoneNumber)
+                    .description(description)
+                    .build()
+        );
+
+        StkPushInitiationResult stkResult = mpesaService.initiateStkPush(phoneNumber, amount, transaction.getId());
+
+        if (!stkResult.isAccepted()) {
+            transaction.setStatus(TransactionStatus.FAILED);
+            transactionRepository.save(transaction);
+            throw new IllegalStateException("STK Push was not accepted: " + stkResult.getResponseDescription());
+        }
+
+        transaction.setMpesaCheckoutRequestId(stkResult.getCheckoutRequestId());
+        transactionRepository.save(transaction);
+
+        writeAudit(AuditEventType.TRANSACTION_CREATED, transaction.getId(), "Transaction",
+                buyerId, "Beat purchase payment initiated: " + description);
+
+        return transaction;
     }
 }

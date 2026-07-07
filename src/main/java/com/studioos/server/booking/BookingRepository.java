@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
 
 @Repository
@@ -32,4 +33,7 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     Optional<Booking> findByIdAndStudioId(String bookingId, String studioId);
 
     Optional<Booking> findByIdAndArtistId(String bookingId, Integer artistId);
+
+    List<Booking> findByStudioIdIn(List<String> studioIds);
+    List<Booking> findByStudioIdInAndPaymentStatus(List<String> studioIds, BookingPaymentStatus paymentStatus);
 }
