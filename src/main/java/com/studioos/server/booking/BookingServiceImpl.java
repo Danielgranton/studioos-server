@@ -12,9 +12,12 @@ import org.springframework.transaction.annotation.Transactional;
 import com.studioos.server.booking.dto.BookingResponse;
 import com.studioos.server.booking.dto.ConfirmBookingRequest;
 import com.studioos.server.booking.dto.CreateBookingRequest;
+import com.studioos.server.notification.NotificationServiceImpl;
+import com.studioos.server.notification.dto.CreateNotificationRequest;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
+import com.studioos.server.shared.enums.NotificationType;
 import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.studio.Studio;
@@ -31,6 +34,7 @@ public class BookingServiceImpl {
 
     private final BookingRepository bookingRepository;
     private final StudioRepository studioRepository;
+    private final NotificationServiceImpl notificationService;
 
     // ─── Create booking (ARTIST only) ───
     @Transactional
@@ -39,11 +43,9 @@ public class BookingServiceImpl {
             throw StudioosException.forbidden("Only artists can create bookings");
         }
 
-        // Verify studio exists
         Studio studio = studioRepository.findById(request.getStudioId())
                 .orElseThrow(() -> StudioosException.notFound("Studio not found"));
 
-        // Check availability (no conflicting bookings)
         LocalDateTime endDate = request.getSessionDate().plusHours(request.getDurationHours());
         List<Booking> conflicts = bookingRepository.findConflictingBookings(
                 request.getStudioId(),
@@ -55,17 +57,20 @@ public class BookingServiceImpl {
         }
 
         Booking booking = Booking.builder()
-        .studioId(request.getStudioId())
-        .artistId(currentUser.getId())
-        .sessionDate(request.getSessionDate())
-        .durationHours(request.getDurationHours())
-        .notes(request.getNotes())
-        .status(BookingStatus.PENDING)
-        .paymentStatus(BookingPaymentStatus.BOOKED)  // ← BOOKED not UNPAID
-        .build();
+                .studioId(request.getStudioId())
+                .artistId(currentUser.getId())
+                .sessionDate(request.getSessionDate())
+                .durationHours(request.getDurationHours())
+                .notes(request.getNotes())
+                .status(BookingStatus.PENDING)
+                .paymentStatus(BookingPaymentStatus.BOOKED)
+                .build();
 
         bookingRepository.save(booking);
         log.info("Booking created: {} by artist: {}", booking.getId(), currentUser.getEmail());
+
+        notifyBookingCreated(booking, studio, currentUser);
+
         return toResponse(booking, studio, currentUser);
     }
 
@@ -78,19 +83,21 @@ public class BookingServiceImpl {
         Studio studio = studioRepository.findById(booking.getStudioId())
                 .orElseThrow(() -> StudioosException.notFound("Studio not found"));
 
-        // Verify ownership
         if (!studio.getOwnerId().equals(currentUser.getId()) && currentUser.getRole() != Role.SUPER_ADMIN) {
             throw StudioosException.forbidden("You do not own this studio");
         }
 
-            if (booking.getStatus() != BookingStatus.PENDING) {
+        if (booking.getStatus() != BookingStatus.PENDING) {
             throw StudioosException.badRequest("Only pending bookings can be confirmed");
         }
 
-        booking.setStatus(BookingStatus.APPROVED);  // ← APPROVED not CONFIRMED
+        booking.setStatus(BookingStatus.APPROVED);
         booking.setTotalPrice(request.getTotalPrice());
         bookingRepository.save(booking);
         log.info("Booking confirmed: {}", bookingId);
+
+        notifyBookingConfirmed(booking, studio);
+
         return toResponse(booking, studio, currentUser);
     }
 
@@ -100,7 +107,6 @@ public class BookingServiceImpl {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> StudioosException.notFound("Booking not found"));
 
-        // Artist can cancel their own booking, Producer can cancel bookings for their studio
         boolean isArtist = booking.getArtistId().equals(currentUser.getId());
         Studio studio = studioRepository.findById(booking.getStudioId()).orElse(null);
         boolean isStudioOwner = studio != null && studio.getOwnerId().equals(currentUser.getId());
@@ -116,6 +122,9 @@ public class BookingServiceImpl {
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
         log.info("Booking cancelled: {}", bookingId);
+
+        boolean cancelledByAdmin = currentUser.getRole() == Role.SUPER_ADMIN && !isArtist && !isStudioOwner;
+        notifyBookingCancelled(booking, studio, isArtist, cancelledByAdmin);
     }
 
     // ─── Get booking details ───
@@ -123,7 +132,6 @@ public class BookingServiceImpl {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> StudioosException.notFound("Booking not found"));
 
-        // User can view their own bookings or studio owner can view bookings for their studio
         boolean isArtist = booking.getArtistId().equals(currentUser.getId());
         Studio studio = studioRepository.findById(booking.getStudioId()).orElse(null);
         boolean isStudioOwner = studio != null && studio.getOwnerId().equals(currentUser.getId());
@@ -165,6 +173,84 @@ public class BookingServiceImpl {
                 bookingRepository.findByStudioId(studioId, pageable)
                         .map(b -> toResponse(b, studio, currentUser))
         );
+    }
+
+    // ─── Notifications ───
+
+    private void notifyBookingCreated(Booking booking, Studio studio, User artist) {
+        try {
+            notificationService.createNotification(buildRequest(
+                    studio.getOwnerId(),
+                    NotificationType.BOOKING_REQUEST,
+                    "New booking request",
+                    (artist.getName() != null ? artist.getName() : "An artist") + " requested a session at \""
+                            + studio.getStudioName() + "\".",
+                    booking.getId()
+            ));
+        } catch (Exception e) {
+            log.error("Failed to send booking-created notification for booking {}: {}", booking.getId(), e.getMessage());
+        }
+    }
+
+    private void notifyBookingConfirmed(Booking booking, Studio studio) {
+        try {
+            notificationService.createNotification(buildRequest(
+                    booking.getArtistId(),
+                    NotificationType.BOOKING_CONFIRMED,
+                    "Booking confirmed",
+                    "Your session at \"" + studio.getStudioName() + "\" has been confirmed.",
+                    booking.getId()
+            ));
+        } catch (Exception e) {
+            log.error("Failed to send booking-confirmed notification for booking {}: {}", booking.getId(), e.getMessage());
+        }
+    }
+
+    private void notifyBookingCancelled(Booking booking, Studio studio, boolean cancelledByArtist, boolean cancelledByAdmin) {
+        try {
+            String studioName = studio != null ? studio.getStudioName() : "the studio";
+
+            if (cancelledByAdmin) {
+                if (studio != null) {
+                    notificationService.createNotification(buildRequest(
+                            studio.getOwnerId(), NotificationType.BOOKING_CANCELLED,
+                            "Booking cancelled", "A booking at \"" + studioName + "\" was cancelled by an administrator.",
+                            booking.getId()));
+                }
+                notificationService.createNotification(buildRequest(
+                        booking.getArtistId(), NotificationType.BOOKING_CANCELLED,
+                        "Booking cancelled", "Your session at \"" + studioName + "\" was cancelled by an administrator.",
+                        booking.getId()));
+                return;
+            }
+
+            if (cancelledByArtist) {
+                if (studio != null) {
+                    notificationService.createNotification(buildRequest(
+                            studio.getOwnerId(), NotificationType.BOOKING_CANCELLED,
+                            "Booking cancelled", "An artist cancelled their session at \"" + studioName + "\".",
+                            booking.getId()));
+                }
+            } else {
+                notificationService.createNotification(buildRequest(
+                        booking.getArtistId(), NotificationType.BOOKING_CANCELLED,
+                        "Booking cancelled", "Your session at \"" + studioName + "\" was cancelled by the studio.",
+                        booking.getId()));
+            }
+        } catch (Exception e) {
+            log.error("Failed to send booking-cancelled notification for booking {}: {}", booking.getId(), e.getMessage());
+        }
+    }
+
+    private CreateNotificationRequest buildRequest(Integer userId, NotificationType type, String title,
+                                                    String message, String relatedEntityId) {
+        CreateNotificationRequest request = new CreateNotificationRequest();
+        request.setUserId(userId);
+        request.setType(type);
+        request.setTitle(title);
+        request.setMessage(message);
+        request.setRelatedEntityId(relatedEntityId);
+        return request;
     }
 
     // ─── Helper ───

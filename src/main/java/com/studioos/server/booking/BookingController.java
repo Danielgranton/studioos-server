@@ -15,9 +15,14 @@ import org.springframework.web.bind.annotation.RestController;
 import com.studioos.server.booking.dto.BookingResponse;
 import com.studioos.server.booking.dto.ConfirmBookingRequest;
 import com.studioos.server.booking.dto.CreateBookingRequest;
+import com.studioos.server.payment.PaymentService;
+import com.studioos.server.payment.Transaction;
 import com.studioos.server.shared.dto.ApiResponse;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.user.User;
+import com.studioos.server.booking.dto.InitiatePaymentRequest;
+import com.studioos.server.booking.dto.PaymentInitiationResponse;
+
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 public class BookingController {
 
     private final BookingServiceImpl bookingService;
+    private final PaymentService paymentService;
 
     // ─── Create booking ───
     @PostMapping
@@ -38,6 +44,22 @@ public class BookingController {
         BookingResponse response = bookingService.createBooking(currentUser, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Booking created successfully", response));
+    }
+
+    // booking payment
+    @PostMapping("/{bookingId}/pay")
+    public ResponseEntity<ApiResponse<PaymentInitiationResponse>> payForBooking(
+        @AuthenticationPrincipal User currentUser,
+        @PathVariable String bookingId,
+        @Valid @RequestBody InitiatePaymentRequest request
+    ) {
+        Transaction transaction = paymentService.initiateBookingPayment(bookingId, request.getPhoneNumber());
+        PaymentInitiationResponse response = PaymentInitiationResponse.builder()
+                            .transactionId(transaction.getId())
+                            .status(transaction.getStatus().name())
+                            .build();
+        return ResponseEntity.ok(ApiResponse.success("Payment initiated Check your phone to complete M-Pesa prompt", response));
+
     }
 
     // ─── Confirm booking ───

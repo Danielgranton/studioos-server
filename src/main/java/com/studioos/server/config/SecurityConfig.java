@@ -44,11 +44,12 @@ public class SecurityConfig {
                         // ─── Public endpoints ───
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
-
                         .requestMatchers(HttpMethod.GET, "/beats/*/download").authenticated()
-
                         .requestMatchers(HttpMethod.GET, "/beats/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/studios/**").permitAll()
+
+                        // ─── M-Pesa callback — Safaricom's servers, no JWT or internal API key possible ───
+                        .requestMatchers("/payment/mpesa/**").permitAll()
 
                         // ─── Internal service-to-service endpoints ───
                         .requestMatchers("/internal/**").permitAll()
