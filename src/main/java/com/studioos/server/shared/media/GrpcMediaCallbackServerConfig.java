@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import io.grpc.Server;
+import io.grpc.ServerServiceDefinition;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 
 @Configuration
@@ -23,8 +24,9 @@ public class GrpcMediaCallbackServerConfig {
             @Value("${media.callback.grpc.port:50052}") int port,
             GrpcMediaCallbackService mediaCallbackService) throws IOException {
 
+        ServerServiceDefinition serviceDefinition = mediaCallbackService.bindService();
         Server server = NettyServerBuilder.forAddress(new java.net.InetSocketAddress(host, port))
-                .addService(mediaCallbackService)
+                .addService(serviceDefinition)
                 .build()
                 .start();
 

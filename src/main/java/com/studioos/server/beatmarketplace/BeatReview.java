@@ -46,9 +46,16 @@ public class BeatReview {
     @Column(nullable = false)
     private String beatId;
 
+    @Column(name = "purchase_id")
+    private String purchaseId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "beatId", insertable = false, updatable = false)
     private Beat beat;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "purchase_id", insertable = false, updatable = false)
+    private BeatPurchase purchase;
 
     @Column(nullable = false)
     private Integer rating;

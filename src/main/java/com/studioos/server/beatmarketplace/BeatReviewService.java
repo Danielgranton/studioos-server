@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.studioos.server.beatmarketplace.dto.BeatReviewResponse;
 import com.studioos.server.beatmarketplace.dto.SubmitReviewRequest;
 import com.studioos.server.shared.enums.BeatPaymentStatus;
+import com.studioos.server.shared.enums.Role;
+import com.studioos.server.shared.exceptions.StudioosException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -19,28 +21,44 @@ public class BeatReviewService {
     private final BeatRepository beatRepository;
     private final BeatReviewRepository beatReviewRepository;
     private final BeatPurchaseRepository beatPurchaseRepository;
+    private final BeatDownloadRepository beatDownloadRepository;
 
     @Transactional
     public BeatReviewResponse submitReview(Integer userId, String beatId, SubmitReviewRequest request) {
+        if (request.getPurchaseId() == null || request.getPurchaseId().isBlank()) {
+            throw StudioosException.badRequest("Purchase ID is required");
+        }
 
         beatRepository.findById(beatId)
                 .orElseThrow(() -> new IllegalArgumentException("Beat not found: " + beatId));
 
-        boolean hasPurchased = beatPurchaseRepository.existsByBeatIdAndBuyerIdAndStatus(
-                beatId, userId, BeatPaymentStatus.PAID);
-        if (!hasPurchased) {
+        BeatPurchase purchase = beatPurchaseRepository.findById(request.getPurchaseId())
+                .orElseThrow(() -> StudioosException.notFound("Purchase not found"));
+
+        if (!purchase.getBeatId().equals(beatId) || !purchase.getBuyerId().equals(userId)) {
+            throw new SecurityException("You cannot review this beat");
+        }
+
+        if (purchase.getStatus() != BeatPaymentStatus.PAID) {
             throw new SecurityException("Only verified buyers can review this beat");
+        }
+
+        boolean hasDownloaded = !beatDownloadRepository.findByPurchaseId(purchase.getId()).isEmpty();
+        if (!hasDownloaded) {
+            throw new SecurityException("You must download the beat before reviewing it");
         }
 
         BeatReview review = beatReviewRepository.findByUserIdAndBeatId(userId, beatId)
                 .map(existing -> {
                     existing.setRating(request.getRating());
                     existing.setComment(request.getComment());
+                    existing.setPurchaseId(purchase.getId());
                     return existing;
                 })
                 .orElseGet(() -> BeatReview.builder()
                         .userId(userId)
                         .beatId(beatId)
+                        .purchaseId(purchase.getId())
                         .rating(request.getRating())
                         .comment(request.getComment())
                         .build());
@@ -69,6 +87,7 @@ public class BeatReviewService {
                 .id(review.getId())
                 .beatId(review.getBeatId())
                 .userId(review.getUserId())
+                .purchaseId(review.getPurchaseId())
                 .rating(review.getRating())
                 .comment(review.getComment())
                 .createdAt(review.getCreatedAt())

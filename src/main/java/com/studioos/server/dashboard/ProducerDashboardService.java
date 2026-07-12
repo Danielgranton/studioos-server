@@ -21,6 +21,8 @@ import com.studioos.server.booking.Booking;
 import com.studioos.server.booking.BookingRepository;
 import com.studioos.server.dashboard.dto.BeatPerformanceResponse;
 import com.studioos.server.dashboard.dto.ProducerDashboardResponse;
+import com.studioos.server.reviews.ProducerReview;
+import com.studioos.server.reviews.ProducerReviewRepository;
 import com.studioos.server.payment.Wallet;
 import com.studioos.server.payment.WalletRepository;
 import com.studioos.server.shared.enums.BeatPaymentStatus;
@@ -39,6 +41,7 @@ public class ProducerDashboardService {
     private final BeatRepository beatRepository;
     private final BeatPurchaseRepository beatPurchaseRepository;
     private final BeatReviewRepository beatReviewRepository;
+    private final ProducerReviewRepository producerReviewRepository;
     private final BookingRepository bookingRepository;
     private final StudioRepository studioRepository;
     private final WalletRepository walletRepository;
@@ -74,9 +77,10 @@ public class ProducerDashboardService {
                 .sum();
 
         List<BeatReview> reviews = beatIds.isEmpty() ? List.of() : beatReviewRepository.findByBeatIdIn(beatIds);
-        Double averageRating = reviews.isEmpty()
+        List<ProducerReview> producerReviews = producerReviewRepository.findByProducerId(producerId);
+        Double averageRating = producerReviews.isEmpty()
                 ? null
-                : reviews.stream().mapToInt(BeatReview::getRating).average().orElse(0.0);
+                : producerReviews.stream().mapToDouble(ProducerReview::getRating).average().orElse(0.0);
 
         Double conversionRate = totalPlays == 0 ? null : (double) totalSales / totalPlays;
 

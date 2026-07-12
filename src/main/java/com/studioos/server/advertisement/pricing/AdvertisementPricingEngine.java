@@ -68,10 +68,10 @@ public class AdvertisementPricingEngine {
     }
 
     private int resolveBaseCpm(AdCreativeType mediaType) {
-        return baseCpmRateRepository.findByMediaTypeAndActiveTrue(mediaType)
-                .map(BaseCpmRate::getBaseCpm)
-                .orElseThrow(() -> new PricingConfigurationException(
-                        "Base CPM for " + mediaType + " is not configured. Cannot price this advertisement."));
+    return baseCpmRateRepository.findByMediaTypeAndActiveTrue(mediaType)
+            .map(rate -> rate.getBaseCpm())
+            .orElseThrow(() -> new PricingConfigurationException(
+                    "Base CPM for " + mediaType + " is not configured. Cannot price this advertisement."));
     }
 
     private RuleLookup lookupExact(PricingRuleType type, String key) {

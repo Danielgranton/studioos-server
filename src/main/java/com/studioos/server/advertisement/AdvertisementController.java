@@ -4,8 +4,12 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import com.studioos.server.advertisement.campaign.AdCampaignService;
+import com.studioos.server.advertisement.campaign.AdCampaignReportService;
+import com.studioos.server.advertisement.campaign.dto.CampaignPaymentInitiationResponse;
+import com.studioos.server.advertisement.campaign.dto.AdCampaignReportResponse;
 import com.studioos.server.advertisement.campaign.dto.CampaignResponse;
 import com.studioos.server.advertisement.campaign.dto.CreateCampaignRequest;
+import com.studioos.server.advertisement.campaign.dto.InitiateCampaignPaymentRequest;
 import com.studioos.server.advertisement.dto.AdUploadCompleteResponse;
 import com.studioos.server.advertisement.dto.AdUploadSessionResponse;
 import com.studioos.server.advertisement.dto.CreateAdvertisementRequest;
@@ -20,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class AdvertisementController {
 
     private final AdCampaignService adCampaignService;
+    private final AdCampaignReportService adCampaignReportService;
     private final AdvertisementUploadService advertisementUploadService;
 
     @PostMapping("/campaigns")
@@ -49,5 +54,20 @@ public class AdvertisementController {
             @AuthenticationPrincipal User advertiser,
             @PathVariable String advertisementId) {
         return advertisementUploadService.refreshUploadSession(advertiser.getId(), advertisementId);
+    }
+
+    @PostMapping("/campaigns/{campaignId}/pay")
+    public CampaignPaymentInitiationResponse payForCampaign(
+            @AuthenticationPrincipal User advertiser,
+            @PathVariable String campaignId,
+            @Valid @RequestBody InitiateCampaignPaymentRequest request) {
+        return adCampaignService.initiatePayment(advertiser.getId(), campaignId, request);
+    }
+
+    @GetMapping("/campaigns/{campaignId}/report")
+    public AdCampaignReportResponse campaignReport(
+            @AuthenticationPrincipal User advertiser,
+            @PathVariable String campaignId) {
+        return adCampaignReportService.getReport(advertiser.getId(), campaignId);
     }
 }

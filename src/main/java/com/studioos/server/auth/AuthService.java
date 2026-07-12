@@ -62,13 +62,12 @@ public class AuthService {
     }
 
     // ─── STEP 2: Verify OTP after registration ───
+    @Transactional
     public AuthResponse verifyRegistration(VerifyOtpRequest request) {
-        // Verify OTP against identifier (email or phone)
-        otpService.verify(request.getIdentifier(), request.getCode());
-
         User user = findByIdentifier(request.getIdentifier());
+        otpService.verify(user.getEmail(), request.getCode());
         log.info("User verified and registered: {}", user.getEmail());
-        return buildAuthResponse(user);
+        return issueAuthResponse(user);
     }
 
     // ─── STEP 1: Login — find user, send OTP ───
@@ -90,12 +89,12 @@ public class AuthService {
     }
 
     // ─── STEP 2: Verify OTP after login ───
+    @Transactional
     public AuthResponse verifyLogin(VerifyOtpRequest request) {
-        otpService.verify(request.getIdentifier(), request.getCode());
-
         User user = findByIdentifier(request.getIdentifier());
+        otpService.verify(user.getEmail(), request.getCode());
         log.info("User logged in: {}", user.getEmail());
-        return buildAuthResponse(user);
+        return issueAuthResponse(user);
     }
 
     // ─── Resend OTP ───
@@ -114,6 +113,7 @@ public class AuthService {
     }
 
     // ─── Refresh token ───
+    @Transactional
     public AuthResponse refreshToken(RefreshTokenRequest request) {
         final String email = jwtService.extractEmail(request.getRefreshToken());
         if (!jwtService.isTokenOfType(request.getRefreshToken(), JwtService.TOKEN_TYPE_REFRESH)) {
@@ -127,7 +127,13 @@ public class AuthService {
             throw StudioosException.unauthorized("Refresh token expired, please login again");
         }
 
-        return buildAuthResponse(user);
+        Integer tokenVersion = jwtService.extractTokenVersion(request.getRefreshToken());
+        int currentVersion = user.getRefreshTokenVersion() == null ? 0 : user.getRefreshTokenVersion();
+        if (tokenVersion == null || tokenVersion != currentVersion) {
+            throw StudioosException.unauthorized("Refresh token has been revoked, please login again");
+        }
+
+        return issueAuthResponse(user);
     }
 
     // ─── Helpers ───
@@ -136,7 +142,10 @@ public class AuthService {
                 .orElseThrow(() -> StudioosException.notFound("No account found with this email or phone number"));
     }
 
-    private AuthResponse buildAuthResponse(User user) {
+    private AuthResponse issueAuthResponse(User user) {
+        user.setRefreshTokenVersion((user.getRefreshTokenVersion() == null ? 0 : user.getRefreshTokenVersion()) + 1);
+        userRepository.save(user);
+
         return AuthResponse.builder()
                 .accessToken(jwtService.generateAccessToken(user))
                 .refreshToken(jwtService.generateRefreshToken(user))

@@ -13,9 +13,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.studioos.server.advertisement.campaign.AdCampaignRepository;
 import com.studioos.server.booking.BookingRepository;
+import com.studioos.server.booking.Booking;
 import com.studioos.server.beatmarketplace.BeatRepository;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.shared.enums.Role;
+import com.studioos.server.shared.enums.BookingPaymentStatus;
+import com.studioos.server.shared.enums.BookingStatus;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.studio.dto.CreateStudioRequest;
 import com.studioos.server.studio.dto.RateStudioRequest;
@@ -127,8 +130,7 @@ public class StudioServiceImpl {
             String location, Integer maxPrice, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
-        Specification<Studio> spec = Specification
-                .where(StudioSpecifications.locationContains(location))
+        Specification<Studio> spec = StudioSpecifications.locationContains(location)
                 .and(StudioSpecifications.pricingAtMost(maxPrice));
 
         Page<Studio> studios = studioRepository.findAll(spec, pageable);
@@ -156,13 +158,31 @@ public class StudioServiceImpl {
             throw StudioosException.badRequest("You cannot rate your own studio");
         }
 
+        Booking booking = bookingRepository.findById(request.getBookingId())
+                .orElseThrow(() -> StudioosException.notFound("Booking not found"));
+
+        if (!booking.getArtistId().equals(currentUser.getId()) && currentUser.getRole() != Role.SUPER_ADMIN) {
+            throw StudioosException.forbidden("You cannot rate this studio");
+        }
+
+        if (!studio.getId().equals(booking.getStudioId())) {
+            throw StudioosException.badRequest("This booking does not belong to the specified studio");
+        }
+
+        if (booking.getStatus() != BookingStatus.DELIVERED
+                || booking.getPaymentStatus() != BookingPaymentStatus.PAID) {
+            throw StudioosException.badRequest("Studio reviews are only allowed after a completed booking");
+        }
+
         StudioRating rating = ratingRepository
                 .findByStudioIdAndUserId(studioId, currentUser.getId())
                 .orElse(StudioRating.builder()
                         .studioId(studioId)
                         .userId(currentUser.getId())
+                        .bookingId(booking.getId())
                         .build());
 
+        rating.setBookingId(booking.getId());
         rating.setRating(request.getRating());
         rating.setReview(request.getReview());
         ratingRepository.save(rating);

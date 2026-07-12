@@ -159,4 +159,37 @@ public class PaymentService {
 
         return transaction;
     }
+
+    @Transactional
+    public Transaction initiateAdCampaignPayment(Integer advertiserId, String studioId, Integer amount,
+                                                String phoneNumber, String description) {
+
+        Transaction transaction = transactionRepository.save(
+                Transaction.builder()
+                        .type(TransactionType.AD_CAMPAIGN)
+                        .status(TransactionStatus.PENDING)
+                        .amount(amount)
+                        .studioId(studioId)
+                        .userId(advertiserId)
+                        .mpesaPhoneNumber(phoneNumber)
+                        .description(description)
+                        .build()
+        );
+
+        StkPushInitiationResult stkResult = mpesaService.initiateStkPush(phoneNumber, amount, transaction.getId());
+
+        if (!stkResult.isAccepted()) {
+            transaction.setStatus(TransactionStatus.FAILED);
+            transactionRepository.save(transaction);
+            throw new IllegalStateException("STK Push was not accepted: " + stkResult.getResponseDescription());
+        }
+
+        transaction.setMpesaCheckoutRequestId(stkResult.getCheckoutRequestId());
+        transactionRepository.save(transaction);
+
+        writeAudit(AuditEventType.TRANSACTION_CREATED, transaction.getId(), "Transaction",
+                advertiserId, "Ad campaign payment initiated: " + description);
+
+        return transaction;
+    }
 }

@@ -16,7 +16,8 @@ public class BeatSummaryResponse {
     private Integer startingPrice;   // cheapest active license price, null if no licenses yet
     private Integer likeCount;
     private Integer playCount;
-    private String producerId;       // TODO: add producerName once User's display-name field is confirmed
+    private String producerId;
+    private String producerName;
     private Integer duration;
     private String waveformUrl;
     private boolean previewAvailable;

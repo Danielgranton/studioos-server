@@ -12,6 +12,7 @@ import com.studioos.server.advertisement.campaign.AdBudget;
 import com.studioos.server.advertisement.campaign.AdBudgetRepository;
 import com.studioos.server.advertisement.campaign.AdCampaign;
 import com.studioos.server.advertisement.campaign.AdCampaignRepository;
+import com.studioos.server.advertisement.dto.AdMediaJobCallbackRequest;
 import com.studioos.server.advertisement.dto.AdUploadCompleteResponse;
 import com.studioos.server.advertisement.dto.AdUploadSessionResponse;
 import com.studioos.server.advertisement.dto.CreateAdvertisementRequest;
@@ -19,6 +20,7 @@ import com.studioos.server.advertisement.pricing.AdvertisementPriceResult;
 import com.studioos.server.advertisement.pricing.AdvertisementPricingService;
 import com.studioos.server.shared.enums.AdCampaignStatus;
 import com.studioos.server.shared.enums.AdCreativeStatus;
+import lombok.extern.slf4j.Slf4j;
 import com.studioos.server.shared.enums.AdMediaJobOperation;
 import com.studioos.server.shared.enums.MediaJobStatus;
 import com.studioos.server.shared.enums.UploadSessionStatus;
@@ -29,6 +31,7 @@ import com.studioos.server.shared.storage.PresignedUrlService;
 import lombok.RequiredArgsConstructor;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AdvertisementUploadService {
 
@@ -41,6 +44,7 @@ public class AdvertisementUploadService {
     private final AdUploadSessionRepository adUploadSessionRepository;
     private final AdMediaProcessingJobRepository adMediaProcessingJobRepository;
     private final AdvertisementPricingService advertisementPricingService;
+    private final AdNotificationService adNotificationService;
     private final PresignedUrlService presignedUrlService;
     private final MediaProcessingClient mediaProcessingClient;
     @Value("${storage.s3.bucket}")
@@ -253,6 +257,7 @@ public class AdvertisementUploadService {
             }
             ad.setStatus(AdCreativeStatus.FAILED);
             advertisementRepository.save(ad);
+            adNotificationService.notifyAdProcessingFailed(ad, errorMessage);
         });
     }
 
@@ -294,8 +299,86 @@ public class AdvertisementUploadService {
 
             ad.setMediaUrl(mediaUrl);
             ad.setThumbnailUrl(thumbnailUrl);
-            ad.setStatus(AdCreativeStatus.READY);
+            ad.setStatus(AdCreativeStatus.PENDING_REVIEW);
             advertisementRepository.save(ad);
+            adNotificationService.notifyAdProcessingCompleted(ad);
+            adNotificationService.notifyAdNeedsReview(ad);
         });
     }
+
+    @Transactional
+    public void handleJobCallback(AdMediaJobCallbackRequest callback) {
+
+        AdMediaProcessingJob job = adMediaProcessingJobRepository.findByExternalJobId(callback.getExternalJobId())
+                .orElseThrow(() -> new IllegalArgumentException("Unknown externalJobId: " + callback.getExternalJobId()));
+
+        if (job.getStatus() != MediaJobStatus.PENDING) {
+            log.warn("Ignoring duplicate callback for ad job {} (already {})", job.getId(), job.getStatus());
+            return;
+        }
+
+        if (!callback.isSuccess()) {
+            job.setStatus(MediaJobStatus.FAILED);
+            job.setErrorMessage(callback.getErrorMessage());
+            adMediaProcessingJobRepository.save(job);
+            log.error("Ad media job failed: ad={} operation={} error={}",
+                    job.getAdvertisementId(), job.getOperation(), callback.getErrorMessage());
+            failAdvertisement(job.getAdvertisementId());
+            return;
+        }
+
+        job.setStatus(MediaJobStatus.SUCCESS);
+        job.setResultReference(callback.getResultReference());
+        adMediaProcessingJobRepository.save(job);
+
+        checkAndFinalizeAdvertisement(job.getAdvertisementId());
+    }
+
+    private void failAdvertisement(String advertisementId) {
+        advertisementRepository.findById(advertisementId).ifPresent(ad -> {
+            if (ad.getStatus() == AdCreativeStatus.PROCESSING) {
+                ad.setStatus(AdCreativeStatus.FAILED);
+                advertisementRepository.save(ad);
+                adNotificationService.notifyAdProcessingFailed(ad, "One or more media jobs failed");
+            }
+        });
+    }
+
+    private void checkAndFinalizeAdvertisement(String advertisementId) {
+        List<AdMediaProcessingJob> jobs = adMediaProcessingJobRepository.findByAdvertisementId(advertisementId);
+
+        boolean anyFailed = jobs.stream().anyMatch(j -> j.getStatus() == MediaJobStatus.FAILED);
+        if (anyFailed) {
+            failAdvertisement(advertisementId);
+            return;
+        }
+
+        boolean allDone = jobs.stream().allMatch(j -> j.getStatus() == MediaJobStatus.SUCCESS);
+        if (!allDone) {
+            return;
+        }
+
+        advertisementRepository.findById(advertisementId).ifPresent(ad -> {
+            if (ad.getStatus() != AdCreativeStatus.PROCESSING) {
+                return; // already finalized — avoid double-processing on a race
+            }
+
+            for (AdMediaProcessingJob job : jobs) {
+                String ref = job.getResultReference();
+                switch (job.getOperation()) {
+                    case IMAGE_WEBP, VIDEO_COMPRESS, AUDIO_COMPRESS -> ad.setMediaUrl(ref);
+                    case IMAGE_THUMBNAIL, VIDEO_THUMBNAIL -> ad.setThumbnailUrl(ref);
+                    case IMAGE_RESIZE, AUDIO_NORMALIZE -> { /* intermediate step only */ }
+                }
+            }
+
+            // Successful processing moves to PENDING_REVIEW, not straight to READY —
+            // an admin still has to approve before this can ever be scheduled/served.
+            ad.setStatus(AdCreativeStatus.PENDING_REVIEW);
+            advertisementRepository.save(ad);
+            adNotificationService.notifyAdProcessingCompleted(ad);
+            adNotificationService.notifyAdNeedsReview(ad);
+        });
+    }
+
 }

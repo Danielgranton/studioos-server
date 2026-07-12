@@ -47,6 +47,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/beats/*/download").authenticated()
                         .requestMatchers(HttpMethod.GET, "/beats/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/studios/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/ads/serve").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/ads/*/click").permitAll()
 
                         // ─── M-Pesa callback — Safaricom's servers, no JWT or internal API key possible ───
                         .requestMatchers("/payment/mpesa/**").permitAll()
@@ -56,6 +58,7 @@ public class SecurityConfig {
 
                         // ─── Admin only ───
                         .requestMatchers("/admin/**").hasRole(Role.SUPER_ADMIN.name())
+                        
 
                         // ─── Everything else requires auth ───
                         .anyRequest().authenticated()

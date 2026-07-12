@@ -2,6 +2,7 @@ package com.studioos.server.studio.dto;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -14,4 +15,7 @@ public class RateStudioRequest {
     private Float rating;
 
     private String review;
+
+    @NotBlank(message = "Booking ID is required")
+    private String bookingId;
 }

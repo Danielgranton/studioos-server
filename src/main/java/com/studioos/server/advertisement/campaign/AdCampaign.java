@@ -52,6 +52,8 @@ public class AdCampaign {
     @Column(nullable = false)
     private LocalDateTime endDate;
 
+    private String transactionId;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

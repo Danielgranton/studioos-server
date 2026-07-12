@@ -15,6 +15,11 @@ import lombok.extern.slf4j.Slf4j;
 public class StubMediaProcessingClient implements MediaProcessingClient {
 
     @Override
+    public boolean health() {
+        return true;
+    }
+
+    @Override
     public String submitJob(String assetReference, String operation, String parametersJson) {
         String fakeJobId = UUID.randomUUID().toString();
         log.info("[STUB] Submitted job {} op={} asset={} params={}",

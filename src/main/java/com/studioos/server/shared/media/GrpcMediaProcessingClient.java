@@ -36,6 +36,13 @@ public class GrpcMediaProcessingClient implements MediaProcessingClient {
     }
 
     @Override
+    public boolean health() {
+        Media.HealthResponse response = blockingStub.health(Media.HealthRequest.newBuilder().build());
+        return response != null && response.getStatus() != null
+                && response.getStatus().equalsIgnoreCase("SERVING");
+    }
+
+    @Override
     public String submitJob(String assetReference, String operation, String parametersJson) {
         Media.MediaJobRequest request = Media.MediaJobRequest.newBuilder()
                 .setAssetReference(assetReference)

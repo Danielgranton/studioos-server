@@ -44,6 +44,9 @@ public class StudioRating {
     @Column(name = "user_id", nullable = false)
     private Integer userId;
 
+    @Column(name = "booking_id")
+    private String bookingId;
+
     @Column(nullable = false)
     private Float rating;
 
@@ -56,6 +59,10 @@ public class StudioRating {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booking_id", insertable = false, updatable = false)
+    private com.studioos.server.booking.Booking booking;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)

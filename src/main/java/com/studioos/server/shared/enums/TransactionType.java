@@ -6,5 +6,6 @@ public enum TransactionType {
     BEAT_PURCHASE,
     COMMISSION,
     WITHDRAWAL,
-    REFUND
+    REFUND,
+    AD_CAMPAIGN,
 }

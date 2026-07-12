@@ -1,115 +1,130 @@
 # StudioOS Server
 
-StudioOS is a Kenyan music production marketplace platform that connects **producers** and **clients**, handling studio bookings, beat purchases, payments, and commissions.
+StudioOS Server is the Spring Boot backend for the StudioOS platform. It handles auth, user profiles, studios, bookings, beat marketplace flows, advertisements, payments, notifications, dashboards, and the gRPC bridge to the C++ media service.
 
-This repository (`studioos-server`) is a **Spring Boot monolith** — a deliberate rewrite from an earlier microservices architecture. Where the old design used inter-service events, this monolith uses internal `ApplicationEventPublisher` / `@EventListener` patterns to keep module boundaries clean without the operational overhead of separate services.
+## What lives here
 
----
----
+- Auth and JWT-based security
+- Studio creation, booking, and studio ratings
+- Beat marketplace: uploads, purchases, playback, downloads, and reviews
+- Advertisement campaigns, ad uploads, media processing orchestration, and review workflow
+- Payments, wallets, withdrawals, notifications, and dashboards
+- Internal gRPC callback listener for media job completion
 
-## Module Status
-
-| Module | Status | Notes |
-
-|---|---|---|
-| Auth & core infra | Done | |
-| User Profile | Done | Profile images stored as URL strings; AWS S3 upload deferred |
-| Studio | Done | Resolved a Hibernate JPQL null-parameter issue via in-memory streaming |
-| Booking | Done | Status flow driven by `BookingStatus` enum |
-| Notification | Done | Email + SMS for OTP (no DB persistence); Email + SMS + DB for general system notifications |
-| Payment | In progress | Wallets, escrow, transactions, withdrawals — M-Pesa STK Push / B2C integration |
-
-**Deferred:** AWS S3 profile image upload integration.
-
----
-
----
-
-Commission is calculated as a **rate lookup**, not a hardcoded enum, so rates can vary (e.g. by studio tier) without a code change.
-
-Beat purchases follow a separate, simpler flow tracked via `BeatPaymentStatus` rather than the booking escrow lifecycle.
-
----
-
-## Getting Started
-
-### Prerequisites
+## Tech stack
 
 - Java 21
-- PostgreSQL (local instance, e.g. `sosdb`)
-- Maven wrapper (bundled — no separate Maven install needed)
+- Spring Boot 3.5.x
+- Spring Data JPA + Flyway
+- PostgreSQL
+- gRPC client for the media service
+- S3-compatible object storage for presigned uploads/downloads
+- M-Pesa, SMTP, and Africa's Talking integrations
 
-### Running the server
+## Requirements
+
+- Java 21
+- PostgreSQL
+- Maven wrapper (`./mvnw`)
+- A running `studioos-media` service if you want real media processing
+
+## Configuration
+
+The server reads configuration from `src/main/resources/application.yaml` and optionally from a local `.env` file.
+
+Common environment variables:
+
+- `DB_HOST`
+- `DB_PORT`
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASSWORD`
+- `JWT_SECRET`
+- `INTERNAL_SERVICE_API_KEY`
+- `MEDIA_SERVICE_HOST` default: `localhost`
+- `MEDIA_SERVICE_PORT` default: `50051`
+- `MEDIA_CALLBACK_GRPC_ENABLED` default: `true`
+- `MEDIA_CALLBACK_GRPC_HOST` default: `0.0.0.0`
+- `MEDIA_CALLBACK_GRPC_PORT` default: `50052`
+- `S3_ENABLED`
+- `AWS_REGION`
+- `AWS_ACCESS_KEY`
+- `AWS_SECRET_KEY`
+- `AWS_BUCKET_NAME`
+- `AWS_S3_ENDPOINT_URL`
+- `AWS_S3_PATH_STYLE`
+- `MPESA_*`
+- `AFRICASTALKING_*`
+- `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`
+
+## Run locally
 
 ```bash
-export $(cat .env | xargs) && ./mvnw spring-boot:run
+export $(cat .env | xargs)
+./mvnw spring-boot:run
 ```
 
-Or, if the `studioos` alias is defined in `~/.zshrc`:
+The API runs at `http://localhost:8080/api` by default.
+
+## Run with gRPC media enabled
+
+The production path uses the real gRPC client in the `grpc-enabled` profile.
 
 ```bash
-studioos
+export $(cat .env | xargs)
+./mvnw spring-boot:run -Dspring-boot.run.profiles=grpc-enabled
 ```
 
-> **Note:** this project uses **zsh**, not bash — shell aliases and exported env vars must live in `~/.zshrc`.
+The server will:
 
-The app starts on `http://localhost:8080/api` by default (Tomcat + `/api` context path).
+- call the media service at `MEDIA_SERVICE_HOST:MEDIA_SERVICE_PORT`
+- expose the callback listener on `MEDIA_CALLBACK_GRPC_PORT`
 
-### Media service
-
-When the Java server is run with the `grpc-enabled` profile, it connects to the C++ media service on `localhost:50051` by default.
+## Build and test
 
 ```bash
-export $(cat .env | xargs) && ./mvnw spring-boot:run -Dspring-boot.run.profiles=grpc-enabled
+./mvnw clean compile
+./mvnw test
 ```
 
-Override `MEDIA_SERVICE_HOST` or `MEDIA_SERVICE_PORT` only if the media server runs elsewhere.
+## Database and migrations
 
----
+Flyway manages the schema in `src/main/resources/db/migration`.
 
-## Database Migrations (Flyway)
+Rules:
 
-Migrations live in `src/main/resources/db/migration`, following standard `V{n}__description.sql` naming.
+- do not edit an applied migration file
+- add a new `V{n}__*.sql` file for each schema change
+- use `./mvnw flyway:repair` only if you intentionally need to repair a broken checksum history
 
-**Rules of thumb learned the hard way:**
+## Main modules
 
-- Never edit an already-applied migration file — Flyway checksums it, and editing it after the fact causes a
- `FlywayValidateException: Migration checksum mismatch`.
- Always add a new `V{n+1}__*.sql` migration instead.
-- If a checksum mismatch does occur (e.g. from an accidental edit), resolve it with:
+- `auth` - login, JWT, security filters
+- `user` - profiles and identity
+- `studio` - studios, studio ratings, producer dashboard inputs
+- `booking` - bookings, booking payments, notifications
+- `beatmarketplace` - beats, licenses, purchases, downloads, reviews
+- `advertisement` - campaigns, ad uploads, pricing, review flow, delivery
+- `payment` - transactions, wallets, withdrawals, escrow-like flows
+- `notification` - email/SMS/in-app notifications
+- `shared/media` - gRPC client, callback server, and polling orchestrator for media jobs
 
-  ```bash
-  export $(cat .env | xargs)
-  ./mvnw flyway:repair
-  ```
+## Media contract
 
-- Numbering conflicts between migrations have occurred during development; resolving them required removing the conflicting row from `flyway_schema_history` directly (version compared as a string cast).
+The server talks to the C++ media service with gRPC only.
 
----
+- submit jobs to `MediaService.SubmitMediaJob`
+- poll jobs with `MediaService.GetMediaJob`
+- accept callbacks on `MediaCallbackService.ReportMediaJob`
 
-## Development Notes
+The callback path is a fast path. Polling is the recovery path.
 
-- **Design before code:** for non-trivial modules (like Payment), the architecture — entities, enums, flows — is reviewed and agreed on *before* any code generation begins.
-- **Sequential module delivery:** each module is built and verified working before starting the next.
-- **Old microservices docs** are kept as a reference for domain logic but are always reconciled against the current monolith structure before being used to guide implementation — the event patterns in particular don't translate 1:1.
+## Security notes
 
----
+- Never commit `.env`
+- Rotate any leaked credentials immediately
+- PostgreSQL schema validation is enabled; fix schema drift with migrations, not by disabling validation
 
-## Security
+## Status
 
-- `.env` must never be committed. If it's ever accidentally tracked, rotate any exposed credentials immediately and remove it from git tracking (`git rm --cached .env`) even though `.gitignore` will stop future commits.
-- JWT-based auth guards the API; see `auth/JwtAuthFilter`.
-
----
-
-## Roadmap
-
-- [ ] Finish Payment module (M-Pesa STK Push + B2C, escrow release/refund logic)
-- [ ] AWS S3 integration for profile image uploads
-- [ ] *(Add your own near-term items here)*
-
----
-
-## License
-
-MIT
+The backend is actively developed. Core marketplace, booking, payments, notifications, gRPC media orchestration, and ad review flows are implemented. Frontend integration and production deployment wiring still need to be finished separately.

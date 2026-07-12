@@ -13,6 +13,7 @@ public class BeatReviewResponse {
     private String id;
     private String beatId;
     private Integer userId;
+    private String purchaseId;
     private Integer rating;
     private String comment;
     private LocalDateTime createdAt;

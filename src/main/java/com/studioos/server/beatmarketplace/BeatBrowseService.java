@@ -7,7 +7,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -20,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.studioos.server.beatmarketplace.dto.BeatSearchRequest;
 import com.studioos.server.beatmarketplace.dto.BeatSummaryResponse;
+import com.studioos.server.user.UserRepository;
+import com.studioos.server.user.User;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,6 +34,7 @@ public class BeatBrowseService {
     private final BeatRepository beatRepository;
     private final BeatLicenseRepository beatLicenseRepository;
     private final BeatPlayHistoryRepository beatPlayHistoryRepository;
+    private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
     public Page<BeatSummaryResponse> search(BeatSearchRequest request) {
@@ -46,8 +51,7 @@ public class BeatBrowseService {
                 .priceMax(request.getPriceMax())
                 .build();
 
-        Specification<Beat> spec = Specification
-                .where(BeatSpecifications.publicAndReady())
+        Specification<Beat> spec = BeatSpecifications.publicAndReady()
                 .and(BeatSpecifications.matchesCriteria(criteria));
 
         if ("TRENDING".equalsIgnoreCase(request.getSortBy())) {
@@ -65,7 +69,9 @@ public class BeatBrowseService {
                 : beatLicenseRepository.findMinPricesByBeatIds(beatIds).stream()
                         .collect(Collectors.toMap(BeatMinPriceProjection::getBeatId, BeatMinPriceProjection::getMinPrice));
 
-        return beats.map(beat -> toSummary(beat, minPrices.get(beat.getId())));
+        Map<Integer, String> producerNames = resolveProducerNames(beats.getContent());
+
+        return beats.map(beat -> toSummary(beat, minPrices.get(beat.getId()), producerNames.get(beat.getProducerId())));
     }
 
     private Sort resolveSort(String sortBy) {
@@ -104,8 +110,10 @@ public class BeatBrowseService {
                 : beatLicenseRepository.findMinPricesByBeatIds(pageBeatIds).stream()
                         .collect(Collectors.toMap(BeatMinPriceProjection::getBeatId, BeatMinPriceProjection::getMinPrice));
 
+        Map<Integer, String> producerNames = resolveProducerNames(content);
+
         return new PageImpl<>(
-                content.stream().map(beat -> toSummary(beat, minPrices.get(beat.getId()))).toList(),
+                content.stream().map(beat -> toSummary(beat, minPrices.get(beat.getId()), producerNames.get(beat.getProducerId()))).toList(),
                 PageRequest.of(page, size),
                 sorted.size());
     }
@@ -124,7 +132,22 @@ public class BeatBrowseService {
         return scores;
     }
 
-    private BeatSummaryResponse toSummary(Beat beat, Integer startingPrice) {
+    private Map<Integer, String> resolveProducerNames(List<Beat> beats) {
+        if (userRepository == null) {
+            return Map.of();
+        }
+
+        Set<Integer> producerIds = beats.stream()
+                .map(Beat::getProducerId)
+                .collect(Collectors.toSet());
+        return StreamSupport.stream(userRepository.findAllById(producerIds).spliterator(), false)
+                .collect(Collectors.toMap(
+                        User::getId,
+                        User::getName,
+                        (left, right) -> left));
+    }
+
+    private BeatSummaryResponse toSummary(Beat beat, Integer startingPrice, String producerName) {
         return BeatSummaryResponse.builder()
                 .id(beat.getId())
                 .title(beat.getTitle())
@@ -135,6 +158,7 @@ public class BeatBrowseService {
                 .likeCount(beat.getLikeCount())
                 .playCount(beat.getPlayCount())
                 .producerId(String.valueOf(beat.getProducerId()))
+                .producerName(producerName)
                 .duration(beat.getDuration())
                 .waveformUrl(beat.getWaveformUrl())
                 .previewAvailable(beat.getPreviewUrl() != null && !beat.getPreviewUrl().isBlank())
