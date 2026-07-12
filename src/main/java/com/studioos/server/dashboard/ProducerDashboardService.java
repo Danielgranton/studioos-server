@@ -178,6 +178,7 @@ public class ProducerDashboardService {
                 .title(beat.getTitle())
                 .status(beat.getStatus().name())
                 .coverUrl(beat.getCoverUrl())
+                .thumbnailUrl(beat.getThumbnailUrl())
                 .playCount(nullToZero(beat.getPlayCount()))
                 .downloadCount(nullToZero(beat.getDownloadCount()))
                 .likeCount(nullToZero(beat.getLikeCount()))

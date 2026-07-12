@@ -9,6 +9,7 @@ import com.studioos.server.shared.enums.WithdrawalStatus;
 public interface WithdrawalRepository extends JpaRepository<Withdrawal, String> {
 
     List<Withdrawal> findByStudioId(String studioId);
+    boolean existsByStudioId(String studioId);
 
     List<Withdrawal> findByStudioIdAndStatus(String studioId, WithdrawalStatus status);
 

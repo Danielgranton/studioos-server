@@ -2,24 +2,32 @@ package com.studioos.server.beatmarketplace;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import static com.studioos.server.beatmarketplace.BeatStorageConstants.BEAT_UPLOAD_PREFIX;
-import static com.studioos.server.beatmarketplace.BeatStorageConstants.MEDIA_BUCKET;
 import com.studioos.server.beatmarketplace.dto.BeatUploadCompleteResponse;
 import com.studioos.server.beatmarketplace.dto.BeatUploadSessionResponse;
 import com.studioos.server.beatmarketplace.dto.CreateBeatRequest;
 import com.studioos.server.beatmarketplace.dto.MediaJobCallbackRequest;
 import com.studioos.server.beatmarketplace.dto.RefreshUploadSessionResponse;
+import com.studioos.server.notification.NotificationServiceImpl;
+import com.studioos.server.notification.dto.CreateNotificationRequest;
 import com.studioos.server.shared.enums.BeatStatus;
 import com.studioos.server.shared.enums.MediaJobOperation;
 import com.studioos.server.shared.enums.MediaJobStatus;
+import com.studioos.server.shared.enums.NotificationType;
 import com.studioos.server.shared.enums.UploadFileType;
 import com.studioos.server.shared.enums.UploadSessionStatus;
+import com.studioos.server.shared.media.MediaJobResult;
 import com.studioos.server.shared.media.MediaProcessingClient;
+import com.studioos.server.shared.storage.StorageObjectMetadata;
 import com.studioos.server.shared.storage.PresignedUrlService;
+import com.studioos.server.studio.Studio;
+import com.studioos.server.studio.StudioRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,13 +38,21 @@ import lombok.extern.slf4j.Slf4j;
 public class BeatService {
 
     private static final int UPLOAD_URL_EXPIRY_SECONDS = 900; // 15 minutes
+    private static final int MIN_BPM = 40;
+    private static final int MAX_BPM = 300;
+    private static final long MAX_AUDIO_BYTES = 200L * 1024L * 1024L;
+    private static final long MAX_COVER_BYTES = 10L * 1024L * 1024L;
 
     private final BeatRepository beatRepository;
     private final BeatGenreRepository beatGenreRepository;
+    private final StudioRepository studioRepository;
     private final UploadSessionRepository uploadSessionRepository;
     private final MediaProcessingJobRepository mediaProcessingJobRepository;
     private final PresignedUrlService presignedUrlService;
     private final MediaProcessingClient mediaProcessingClient;
+    private final NotificationServiceImpl notificationService;
+    @Value("${storage.s3.bucket}")
+    private String mediaBucket;
 
     @Transactional
     public BeatUploadSessionResponse createDraftAndUploadSessions(Integer producerId, CreateBeatRequest request) {
@@ -44,13 +60,25 @@ public class BeatService {
         beatGenreRepository.findById(request.getGenreId())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid genreId: " + request.getGenreId()));
 
-        // TODO: validate producer owns the studio (once StudioService exposes an ownership check)
-        // TODO: validate BPM range, optional title-uniqueness check per your original design notes
+        Studio studio = studioRepository.findById(request.getStudioId())
+                .orElseThrow(() -> new IllegalArgumentException("Studio not found: " + request.getStudioId()));
+        if (!studio.getOwnerId().equals(producerId)) {
+            throw new SecurityException("Producer does not own this studio");
+        }
+
+        if (request.getBpm() != null && (request.getBpm() < MIN_BPM || request.getBpm() > MAX_BPM)) {
+            throw new IllegalArgumentException("BPM must be between " + MIN_BPM + " and " + MAX_BPM);
+        }
+
+        String normalizedTitle = normalizeTitle(request.getTitle());
+        if (beatRepository.existsByStudioIdAndTitleIgnoreCase(request.getStudioId(), normalizedTitle)) {
+            throw new IllegalStateException("A beat with this title already exists in the studio");
+        }
 
         Beat beat = Beat.builder()
                 .producerId(producerId)
                 .studioId(request.getStudioId())
-                .title(request.getTitle())
+                .title(normalizedTitle)
                 .description(request.getDescription())
                 .genreId(request.getGenreId())
                 .bpm(request.getBpm())
@@ -70,7 +98,7 @@ public class BeatService {
         UploadSession audioSession = UploadSession.builder()
                 .producerId(producerId)
                 .beatId(beat.getId())
-                .bucket(MEDIA_BUCKET)
+                .bucket(mediaBucket)
                 .objectKey(audioKey)
                 .fileType(UploadFileType.AUDIO)
                 .contentType("audio/mpeg")
@@ -81,7 +109,7 @@ public class BeatService {
         UploadSession coverSession = UploadSession.builder()
                 .producerId(producerId)
                 .beatId(beat.getId())
-                .bucket(MEDIA_BUCKET)
+                .bucket(mediaBucket)
                 .objectKey(coverKey)
                 .fileType(UploadFileType.COVER)
                 .contentType("image/jpeg")
@@ -93,9 +121,9 @@ public class BeatService {
         coverSession = uploadSessionRepository.save(coverSession);
 
         String audioUploadUrl = presignedUrlService.generateUploadUrl(
-                MEDIA_BUCKET, audioKey, "audio/mpeg", UPLOAD_URL_EXPIRY_SECONDS);
+                mediaBucket, audioKey, "audio/mpeg", UPLOAD_URL_EXPIRY_SECONDS);
         String coverUploadUrl = presignedUrlService.generateUploadUrl(
-                MEDIA_BUCKET, coverKey, "image/jpeg", UPLOAD_URL_EXPIRY_SECONDS);
+                mediaBucket, coverKey, "image/jpeg", UPLOAD_URL_EXPIRY_SECONDS);
 
         return BeatUploadSessionResponse.builder()
                 .beatId(beat.getId())
@@ -121,42 +149,29 @@ public class BeatService {
                     "Upload already completed or beat is in an unexpected state: " + beat.getStatus());
         }
 
-        List<UploadSession> sessions = uploadSessionRepository.findByBeatId(beatId);
-
-        UploadSession audioSession = sessions.stream()
-                .filter(s -> s.getFileType() == UploadFileType.AUDIO)
-                .findFirst()
+        UploadSession audioSession = uploadSessionRepository
+                .findTopByBeatIdAndFileTypeOrderByCreatedAtDesc(beatId, UploadFileType.AUDIO)
                 .orElseThrow(() -> new IllegalStateException("Missing audio upload session for beat " + beatId));
-
-        UploadSession coverSession = sessions.stream()
-                .filter(s -> s.getFileType() == UploadFileType.COVER)
-                .findFirst()
+        UploadSession coverSession = uploadSessionRepository
+                .findTopByBeatIdAndFileTypeOrderByCreatedAtDesc(beatId, UploadFileType.COVER)
                 .orElseThrow(() -> new IllegalStateException("Missing cover upload session for beat " + beatId));
 
-        if (audioSession.getStatus() == UploadSessionStatus.VERIFIED
-                || coverSession.getStatus() == UploadSessionStatus.VERIFIED) {
+        if (audioSession.getStatus() != UploadSessionStatus.PENDING
+                || coverSession.getStatus() != UploadSessionStatus.PENDING) {
             throw new IllegalStateException("Upload already verified for beat " + beatId);
         }
 
-        boolean audioExists = presignedUrlService.objectExists(audioSession.getBucket(), audioSession.getObjectKey());
-        boolean coverExists = presignedUrlService.objectExists(coverSession.getBucket(), coverSession.getObjectKey());
-
-        if (!audioExists) {
-            audioSession.setStatus(UploadSessionStatus.FAILED);
-            uploadSessionRepository.save(audioSession);
-            throw new IllegalStateException("Audio file not found in storage for beat " + beatId);
-        }
-
-        if (!coverExists) {
-            coverSession.setStatus(UploadSessionStatus.FAILED);
-            uploadSessionRepository.save(coverSession);
-            throw new IllegalStateException("Cover file not found in storage for beat " + beatId);
-        }
-
-        // TODO: validate file sizes once objectExists/head-object call returns real metadata (post-S3 wiring)
+        StorageObjectMetadata audioMetadata = requireUploadedObject(
+                audioSession, MAX_AUDIO_BYTES, "Audio file not found in storage for beat " + beatId);
+        StorageObjectMetadata coverMetadata = requireUploadedObject(
+                coverSession, MAX_COVER_BYTES, "Cover file not found in storage for beat " + beatId);
 
         audioSession.setStatus(UploadSessionStatus.VERIFIED);
+        audioSession.setSizeBytes(audioMetadata.contentLength());
+        audioSession.setChecksum(normalizeChecksum(audioMetadata.eTag()));
         coverSession.setStatus(UploadSessionStatus.VERIFIED);
+        coverSession.setSizeBytes(coverMetadata.contentLength());
+        coverSession.setChecksum(normalizeChecksum(coverMetadata.eTag()));
         uploadSessionRepository.save(audioSession);
         uploadSessionRepository.save(coverSession);
 
@@ -203,7 +218,7 @@ public class BeatService {
         UploadSession newAudioSession = UploadSession.builder()
                 .producerId(producerId)
                 .beatId(beat.getId())
-                .bucket(MEDIA_BUCKET)
+                .bucket(mediaBucket)
                 .objectKey(audioKey)
                 .fileType(UploadFileType.AUDIO)
                 .contentType("audio/mpeg")
@@ -214,7 +229,7 @@ public class BeatService {
         UploadSession newCoverSession = UploadSession.builder()
                 .producerId(producerId)
                 .beatId(beat.getId())
-                .bucket(MEDIA_BUCKET)
+                .bucket(mediaBucket)
                 .objectKey(coverKey)
                 .fileType(UploadFileType.COVER)
                 .contentType("image/jpeg")
@@ -226,9 +241,9 @@ public class BeatService {
         newCoverSession = uploadSessionRepository.save(newCoverSession);
 
         String audioUploadUrl = presignedUrlService.generateUploadUrl(
-                MEDIA_BUCKET, audioKey, "audio/mpeg", UPLOAD_URL_EXPIRY_SECONDS);
+                mediaBucket, audioKey, "audio/mpeg", UPLOAD_URL_EXPIRY_SECONDS);
         String coverUploadUrl = presignedUrlService.generateUploadUrl(
-                MEDIA_BUCKET, coverKey, "image/jpeg", UPLOAD_URL_EXPIRY_SECONDS);
+                mediaBucket, coverKey, "image/jpeg", UPLOAD_URL_EXPIRY_SECONDS);
 
         return RefreshUploadSessionResponse.builder()
                 .beatId(beat.getId())
@@ -241,31 +256,45 @@ public class BeatService {
 
     @Transactional
     public void handleJobCallback(MediaJobCallbackRequest callback) {
+        MediaJobResult result = MediaJobResult.builder()
+                .jobId(callback.getExternalJobId())
+                .status(callback.isSuccess() ? MediaJobStatus.SUCCESS : MediaJobStatus.FAILED)
+                .resultReference(callback.getResultReference())
+                .errorMessage(callback.getErrorMessage())
+                .build();
+        applyMediaJobResult(result);
+    }
 
-        MediaProcessingJob job = mediaProcessingJobRepository.findByExternalJobId(callback.getExternalJobId())
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Unknown externalJobId: " + callback.getExternalJobId()));
-
-        if (job.getStatus() != MediaJobStatus.PENDING) {
-            log.warn("Ignoring duplicate callback for job {} (already {})", job.getId(), job.getStatus());
-            return;
+    @Transactional
+    public boolean applyMediaJobResult(MediaJobResult result) {
+        MediaProcessingJob job = mediaProcessingJobRepository.findByExternalJobId(result.getJobId())
+                .orElse(null);
+        if (job == null) {
+            return false;
         }
 
-        if (!callback.isSuccess()) {
-            job.setStatus(MediaJobStatus.FAILED);
-            job.setErrorMessage(callback.getErrorMessage());
-            mediaProcessingJobRepository.save(job);
-            log.error("Media job failed: beat={} operation={} error={}",
-                    job.getBeatId(), job.getOperation(), callback.getErrorMessage());
-            failBeat(job.getBeatId());
-            return;
+        if (job.getStatus().isTerminal()) {
+            log.debug("Ignoring duplicate media result for job {} (already {})", job.getId(), job.getStatus());
+            return true;
         }
 
-        job.setStatus(MediaJobStatus.SUCCESS);
-        job.setResultReference(callback.getResultReference());
+        MediaJobStatus nextStatus = result.getStatus() == null ? MediaJobStatus.QUEUED : result.getStatus();
+        job.setStatus(nextStatus);
+        job.setResultReference(result.getResultReference());
+        job.setErrorMessage(result.getErrorMessage());
         mediaProcessingJobRepository.save(job);
 
-        checkAndFinalizeBeat(job.getBeatId());
+        if (nextStatus == MediaJobStatus.FAILED) {
+            log.error("Media job failed: beat={} operation={} error={}",
+                    job.getBeatId(), job.getOperation(), result.getErrorMessage());
+            failBeat(job.getBeatId());
+            return true;
+        }
+
+        if (nextStatus == MediaJobStatus.SUCCESS) {
+            checkAndFinalizeBeat(job.getBeatId());
+        }
+        return true;
     }
 
     private void submitProcessingJobs(Beat beat, UploadSession audioSession, UploadSession coverSession) {
@@ -287,7 +316,7 @@ public class BeatService {
                 .beatId(beatId)
                 .operation(operation)
                 .externalJobId(externalJobId)
-                .status(MediaJobStatus.PENDING)
+                .status(MediaJobStatus.QUEUED)
                 .build();
 
         mediaProcessingJobRepository.save(job);
@@ -298,7 +327,12 @@ public class BeatService {
             if (beat.getStatus() == BeatStatus.PROCESSING) {
                 beat.setStatus(BeatStatus.FAILED);
                 beatRepository.save(beat);
-                // TODO: notify producer of processing failure once NotificationService hook is wired here
+                notifyProducer(
+                        beat.getProducerId(),
+                        NotificationType.BEAT_PROCESSING_FAILED,
+                        "Beat processing failed",
+                        "Your beat \"" + beat.getTitle() + "\" could not be processed. Please review the upload and try again.",
+                        beat.getId());
             }
         });
     }
@@ -328,15 +362,78 @@ public class BeatService {
                     case AUDIO_NORMALIZE -> beat.setAudioUrl(ref);
                     case AUDIO_PREVIEW -> beat.setPreviewUrl(ref);
                     case AUDIO_WAVEFORM -> beat.setWaveformUrl(ref);
+                    case COVER_THUMBNAIL -> beat.setThumbnailUrl(ref);
                     case COVER_WEBP -> beat.setCoverUrl(ref);
-                    case COVER_THUMBNAIL -> { /* TODO: Beat has no thumbnailUrl column yet */ }
                     case COVER_RESIZE -> { /* intermediate step only */ }
                 }
             }
 
             beat.setStatus(BeatStatus.READY);
             beatRepository.save(beat);
-            // TODO: notify producer that their beat finished processing
+            notifyProducer(
+                    beat.getProducerId(),
+                    NotificationType.BEAT_PROCESSING_COMPLETED,
+                    "Beat processing completed",
+                    "Your beat \"" + beat.getTitle() + "\" is ready.",
+                    beat.getId());
         });
+    }
+
+    private void notifyProducer(Integer producerId, NotificationType type, String title, String message,
+                                String relatedEntityId) {
+        try {
+            CreateNotificationRequest request = new CreateNotificationRequest();
+            request.setUserId(producerId);
+            request.setType(type);
+            request.setTitle(title);
+            request.setMessage(message);
+            request.setRelatedEntityId(relatedEntityId);
+            notificationService.createNotification(request);
+        } catch (Exception e) {
+            log.error("Failed to notify producer {} about beat event {}: {}", producerId, type, e.getMessage());
+        }
+    }
+
+    private StorageObjectMetadata requireUploadedObject(
+            UploadSession session,
+            long maxBytes,
+            String notFoundMessage) {
+
+        Optional<StorageObjectMetadata> metadata = presignedUrlService.objectMetadata(
+                session.getBucket(), session.getObjectKey());
+
+        StorageObjectMetadata objectMetadata = metadata.orElseThrow(() -> new IllegalStateException(notFoundMessage));
+
+        if (objectMetadata.contentLength() == null || objectMetadata.contentLength() <= 0) {
+            throw new IllegalStateException("Uploaded file has no content length for session " + session.getId());
+        }
+
+        if (objectMetadata.contentLength() > maxBytes) {
+            throw new IllegalStateException("Uploaded file exceeds the allowed size for session " + session.getId());
+        }
+
+        if (session.getContentType() != null && !session.getContentType().isBlank()
+                && objectMetadata.contentType() != null
+                && !session.getContentType().equalsIgnoreCase(objectMetadata.contentType())) {
+            throw new IllegalStateException(
+                    "Uploaded file content type does not match the expected type for session " + session.getId());
+        }
+
+        return objectMetadata;
+    }
+
+    private String normalizeChecksum(String checksum) {
+        if (checksum == null) {
+            return null;
+        }
+        String trimmed = checksum.trim();
+        if (trimmed.startsWith("\"") && trimmed.endsWith("\"") && trimmed.length() >= 2) {
+            return trimmed.substring(1, trimmed.length() - 1);
+        }
+        return trimmed;
+    }
+
+    private String normalizeTitle(String title) {
+        return title == null ? null : title.trim().replaceAll("\\s+", " ");
     }
 }

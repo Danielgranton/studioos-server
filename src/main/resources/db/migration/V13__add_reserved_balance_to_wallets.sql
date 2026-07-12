@@ -1,0 +1,2 @@
+ALTER TABLE wallets
+    ADD COLUMN IF NOT EXISTS reserved_balance INTEGER NOT NULL DEFAULT 0;

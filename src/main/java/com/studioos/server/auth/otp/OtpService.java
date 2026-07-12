@@ -17,6 +17,8 @@ public class OtpService {
 
     private static final int OTP_LENGTH = 6;
     private static final int OTP_EXPIRY_MINUTES = 10;
+    private static final int MAX_FAILED_ATTEMPTS = 5;
+    private static final int LOCKOUT_MINUTES = 10;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final OtpRepository otpRepository;
@@ -31,6 +33,8 @@ public class OtpService {
                 .identifier(identifier)
                 .code(code)
                 .expiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES))
+                .failedAttempts(0)
+                .lockedUntil(null)
                 .build();
 
         otpRepository.save(otp);
@@ -43,16 +47,28 @@ public class OtpService {
                 .findTopByIdentifierAndUsedFalseOrderByCreatedAtDesc(identifier)
                 .orElseThrow(() -> StudioosException.badRequest("No active OTP found. Please request a new one"));
 
+        if (otp.getLockedUntil() != null && LocalDateTime.now().isBefore(otp.getLockedUntil())) {
+            throw StudioosException.badRequest("Too many invalid attempts. Please request a new OTP");
+        }
+
         if (otp.isExpired()) {
             throw StudioosException.badRequest("OTP has expired. Please request a new one");
         }
 
         if (!otp.getCode().equals(code)) {
+            int nextAttempts = otp.getFailedAttempts() == null ? 1 : otp.getFailedAttempts() + 1;
+            otp.setFailedAttempts(nextAttempts);
+            if (nextAttempts >= MAX_FAILED_ATTEMPTS) {
+                otp.setLockedUntil(LocalDateTime.now().plusMinutes(LOCKOUT_MINUTES));
+            }
+            otpRepository.save(otp);
             throw StudioosException.badRequest("Invalid OTP");
         }
 
         // Mark as used
         otp.setUsed(true);
+        otp.setFailedAttempts(0);
+        otp.setLockedUntil(null);
         otpRepository.save(otp);
         log.info("OTP verified for identifier: {}", maskIdentifier(identifier));
     }

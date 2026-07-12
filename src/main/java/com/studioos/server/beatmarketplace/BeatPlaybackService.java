@@ -1,9 +1,9 @@
 package com.studioos.server.beatmarketplace;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import static com.studioos.server.beatmarketplace.BeatStorageConstants.MEDIA_BUCKET;
 import com.studioos.server.beatmarketplace.dto.BeatDownloadResponse;
 import com.studioos.server.beatmarketplace.dto.BeatPreviewResponse;
 import com.studioos.server.shared.enums.BeatPaymentStatus;
@@ -25,6 +25,8 @@ public class BeatPlaybackService {
     private final PresignedUrlService presignedUrlService;
     private final BeatPurchaseRepository beatPurchaseRepository;
     private final BeatDownloadRepository beatDownloadRepository;
+    @Value("${storage.s3.bucket}")
+    private String mediaBucket;
 
     @Transactional
     public BeatPreviewResponse getPreviewUrl(String beatId, Integer userId) {
@@ -45,7 +47,7 @@ public class BeatPlaybackService {
         }
 
         String signedUrl = presignedUrlService.generateDownloadUrl(
-                MEDIA_BUCKET, beat.getPreviewUrl(), PREVIEW_URL_EXPIRY_SECONDS);
+                mediaBucket, beat.getPreviewUrl(), PREVIEW_URL_EXPIRY_SECONDS);
 
         recordPlay(beat, userId);
 
@@ -86,7 +88,7 @@ public class BeatPlaybackService {
         }
 
         String signedUrl = presignedUrlService.generateDownloadUrl(
-                MEDIA_BUCKET, beat.getAudioUrl(), DOWNLOAD_URL_EXPIRY_SECONDS);
+                mediaBucket, beat.getAudioUrl(), DOWNLOAD_URL_EXPIRY_SECONDS);
 
         recordDownload(purchase, beat, ipAddress);
 

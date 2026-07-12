@@ -12,6 +12,11 @@ import lombok.Data;
 public class MediaJobResult {
     private String jobId;
     private MediaJobStatus status;
+    private String assetReference;
+    private String operation;
+    private String parametersJson;
     private String resultReference;
     private String errorMessage;
+    private long createdAtUnixMs;
+    private long updatedAtUnixMs;
 }

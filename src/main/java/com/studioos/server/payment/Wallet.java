@@ -46,6 +46,10 @@ public class Wallet {
 
     @Column(nullable = false)
     @Builder.Default
+    private Integer reservedBalance = 0;
+
+    @Column(nullable = false)
+    @Builder.Default
     private Integer withdrawnBalance = 0;
 
     // ─── Audit ───

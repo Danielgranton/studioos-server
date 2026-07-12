@@ -1,13 +1,21 @@
 package com.studioos.server.payment;
 
+import com.studioos.server.notification.NotificationServiceImpl;
+import com.studioos.server.notification.dto.CreateNotificationRequest;
+import com.studioos.server.payment.dto.B2cInitiationResult;
 import com.studioos.server.shared.enums.AuditEventType;
+import com.studioos.server.shared.enums.NotificationType;
 import com.studioos.server.shared.enums.TransactionStatus;
 import com.studioos.server.shared.enums.TransactionType;
 import com.studioos.server.shared.enums.WithdrawalStatus;
+import com.studioos.server.studio.Studio;
+import com.studioos.server.studio.StudioRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WithdrawalService {
@@ -16,13 +24,10 @@ public class WithdrawalService {
     private final TransactionRepository transactionRepository;
     private final AuditLogRepository auditLogRepository;
     private final WalletService walletService;
+    private final StudioRepository studioRepository;
+    private final NotificationServiceImpl notificationService;
     private final MpesaService mpesaService; // filled in last
 
-    /**
-     * Step 1: Producer requests a withdrawal. Validates available balance,
-     * creates a PENDING withdrawal record. Does NOT move money yet —
-     * that only happens on approval.
-     */
     @Transactional
     public Withdrawal requestWithdrawal(String studioId, int amount, String phoneNumber) {
         if (amount <= 0) {
@@ -50,12 +55,6 @@ public class WithdrawalService {
         return withdrawal;
     }
 
-    /**
-     * Step 2: Admin (or auto-approval logic) approves the request. Re-validates
-     * balance (it may have changed since the request was made), then triggers
-     * the M-Pesa B2C payout. Does NOT debit the wallet yet — that happens on
-     * confirmed payout success, not on approval.
-     */
     @Transactional
     public Withdrawal approveWithdrawal(String withdrawalId) {
         Withdrawal withdrawal = getPendingWithdrawalOrThrow(withdrawalId);
@@ -70,15 +69,29 @@ public class WithdrawalService {
         withdrawal.setStatus(WithdrawalStatus.APPROVED);
         withdrawalRepository.save(withdrawal);
 
-        mpesaService.initiateB2cPayout(withdrawal.getMpesaPhoneNumber(), withdrawal.getAmount(), withdrawal.getId());
+        walletService.reserveForWithdrawal(wallet.getId(), withdrawal.getAmount());
+
+        B2cInitiationResult result;
+        try {
+            result = mpesaService.initiateB2cPayout(
+                    withdrawal.getMpesaPhoneNumber(), withdrawal.getAmount(), withdrawal.getId());
+        } catch (RuntimeException e) {
+            walletService.releaseReservedWithdrawal(wallet.getId(), withdrawal.getAmount());
+            withdrawal.setStatus(WithdrawalStatus.PENDING);
+            withdrawalRepository.save(withdrawal);
+            throw e;
+        }
+
+        if (!result.isAccepted()) {
+            walletService.releaseReservedWithdrawal(wallet.getId(), withdrawal.getAmount());
+            withdrawal.setStatus(WithdrawalStatus.PENDING);
+            withdrawalRepository.save(withdrawal);
+            throw new IllegalStateException("B2C payout was not accepted: " + result.getResponseDescription());
+        }
 
         return withdrawal;
     }
 
-    /**
-     * Producer or admin rejects a pending request. No money movement involved
-     * since nothing was ever debited yet.
-     */
     @Transactional
     public Withdrawal rejectWithdrawal(String withdrawalId, String reason) {
         Withdrawal withdrawal = getPendingWithdrawalOrThrow(withdrawalId);
@@ -90,20 +103,23 @@ public class WithdrawalService {
         writeAudit(AuditEventType.TRANSACTION_CREATED, withdrawal.getId(), "Withdrawal", null,
                 "Withdrawal rejected: " + reason);
 
+        notifyWithdrawalRejected(withdrawal, reason);
+
         return withdrawal;
     }
 
-    /**
-     * Step 3: M-Pesa B2C callback confirms the payout result. On success,
-     * debits the wallet (available -> withdrawn) and creates the WITHDRAWAL
-     * transaction. On failure, marks the withdrawal FAILED-equivalent —
-     * note WithdrawalStatus has no FAILED state, so we fall back to REJECTED
-     * with a reason. Flagging this below.
-     */
     @Transactional
     public Withdrawal handleMpesaB2cCallback(String withdrawalId, boolean success, String mpesaReceiptNumber) {
         Withdrawal withdrawal = withdrawalRepository.findById(withdrawalId)
                 .orElseThrow(() -> new IllegalArgumentException("Withdrawal not found: " + withdrawalId));
+
+        if (withdrawal.getStatus() == WithdrawalStatus.COMPLETED) {
+            return withdrawal;
+        }
+
+        if (withdrawal.getStatus() == WithdrawalStatus.REJECTED) {
+            return withdrawal;
+        }
 
         if (withdrawal.getStatus() != WithdrawalStatus.APPROVED) {
             throw new IllegalStateException(
@@ -111,13 +127,17 @@ public class WithdrawalService {
         }
 
         if (!success) {
+            Wallet wallet = walletService.getOrCreateStudioWallet(withdrawal.getStudioId());
+            walletService.releaseReservedWithdrawal(wallet.getId(), withdrawal.getAmount());
             withdrawal.setStatus(WithdrawalStatus.REJECTED);
             withdrawal.setRejectionReason("M-Pesa B2C transfer failed");
-            return withdrawalRepository.save(withdrawal);
+            withdrawalRepository.save(withdrawal);
+            notifyWithdrawalFailed(withdrawal);
+            return withdrawal;
         }
 
         Wallet wallet = walletService.getOrCreateStudioWallet(withdrawal.getStudioId());
-        walletService.debitForWithdrawal(wallet.getId(), withdrawal.getAmount());
+        walletService.commitReservedWithdrawal(wallet.getId(), withdrawal.getAmount());
 
         Transaction transaction = transactionRepository.save(
                 Transaction.builder()
@@ -139,7 +159,75 @@ public class WithdrawalService {
         writeAudit(AuditEventType.WALLET_UPDATED, wallet.getId(), "Wallet", null,
                 "Wallet debited " + withdrawal.getAmount() + " for withdrawal " + withdrawal.getId());
 
+        notifyWithdrawalCompleted(withdrawal, mpesaReceiptNumber);
+
         return withdrawal;
+    }
+
+    // ─── Notifications ───
+
+    private void notifyWithdrawalCompleted(Withdrawal withdrawal, String mpesaReceiptNumber) {
+        try {
+            Integer ownerId = resolveOwnerId(withdrawal.getStudioId());
+            if (ownerId == null) return;
+            notificationService.createNotification(buildRequest(
+                    ownerId, NotificationType.WALLET_TRANSACTION,
+                    "Payout sent",
+                    "KES " + withdrawal.getAmount() + " has been sent to your M-Pesa (receipt: "
+                            + mpesaReceiptNumber + ").",
+                    withdrawal.getId()
+            ));
+        } catch (Exception e) {
+            log.error("Failed to send withdrawal-completed notification for {}: {}", withdrawal.getId(), e.getMessage());
+        }
+    }
+
+    private void notifyWithdrawalFailed(Withdrawal withdrawal) {
+        try {
+            Integer ownerId = resolveOwnerId(withdrawal.getStudioId());
+            if (ownerId == null) return;
+            notificationService.createNotification(buildRequest(
+                    ownerId, NotificationType.WALLET_TRANSACTION,
+                    "Payout failed",
+                    "Your withdrawal of KES " + withdrawal.getAmount()
+                            + " could not be completed. Your funds remain in your wallet — please try again.",
+                    withdrawal.getId()
+            ));
+        } catch (Exception e) {
+            log.error("Failed to send withdrawal-failed notification for {}: {}", withdrawal.getId(), e.getMessage());
+        }
+    }
+
+    private void notifyWithdrawalRejected(Withdrawal withdrawal, String reason) {
+        try {
+            Integer ownerId = resolveOwnerId(withdrawal.getStudioId());
+            if (ownerId == null) return;
+            notificationService.createNotification(buildRequest(
+                    ownerId, NotificationType.WALLET_TRANSACTION,
+                    "Withdrawal rejected",
+                    "Your withdrawal request of KES " + withdrawal.getAmount() + " was rejected: " + reason,
+                    withdrawal.getId()
+            ));
+        } catch (Exception e) {
+            log.error("Failed to send withdrawal-rejected notification for {}: {}", withdrawal.getId(), e.getMessage());
+        }
+    }
+
+    private Integer resolveOwnerId(String studioId) {
+        return studioRepository.findById(studioId)
+                .map(Studio::getOwnerId)
+                .orElse(null);
+    }
+
+    private CreateNotificationRequest buildRequest(Integer userId, NotificationType type, String title,
+                                                    String message, String relatedEntityId) {
+        CreateNotificationRequest request = new CreateNotificationRequest();
+        request.setUserId(userId);
+        request.setType(type);
+        request.setTitle(title);
+        request.setMessage(message);
+        request.setRelatedEntityId(relatedEntityId);
+        return request;
     }
 
     private Withdrawal getPendingWithdrawalOrThrow(String withdrawalId) {

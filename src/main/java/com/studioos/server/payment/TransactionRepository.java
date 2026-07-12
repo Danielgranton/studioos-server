@@ -13,6 +13,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     List<Transaction> findByBookingId(String bookingId);
 
     List<Transaction> findByStudioId(String studioId);
+    boolean existsByStudioId(String studioId);
 
     List<Transaction> findByUserId(Integer userId);
 

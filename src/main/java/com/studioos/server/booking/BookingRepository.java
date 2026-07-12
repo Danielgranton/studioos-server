@@ -18,6 +18,7 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
 
     // Find by studio owner
     Page<Booking> findByStudioId(String studioId, Pageable pageable);
+    boolean existsByStudioId(String studioId);
 
     // Find by artist
     Page<Booking> findByArtistId(Integer artistId, Pageable pageable);

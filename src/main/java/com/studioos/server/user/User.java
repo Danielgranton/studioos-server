@@ -57,6 +57,10 @@ public class User implements UserDetails {
     @Builder.Default
     private Role role = Role.USER;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer refreshTokenVersion = 0;
+
     // ─── Profile ───
     private String location;
 

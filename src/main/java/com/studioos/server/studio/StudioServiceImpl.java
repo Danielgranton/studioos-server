@@ -7,9 +7,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.studioos.server.advertisement.campaign.AdCampaignRepository;
+import com.studioos.server.booking.BookingRepository;
+import com.studioos.server.beatmarketplace.BeatRepository;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.exceptions.StudioosException;
@@ -29,6 +33,11 @@ public class StudioServiceImpl {
 
     private final StudioRepository studioRepository;
     private final StudioRatingRepository ratingRepository;
+    private final BeatRepository beatRepository;
+    private final BookingRepository bookingRepository;
+    private final AdCampaignRepository adCampaignRepository;
+    private final com.studioos.server.payment.TransactionRepository transactionRepository;
+    private final com.studioos.server.payment.WithdrawalRepository withdrawalRepository;
 
     // ─── Create studio (PRODUCER only) ───
    @Transactional
@@ -101,6 +110,7 @@ public class StudioServiceImpl {
     @Transactional
     public void deleteStudio(User currentUser, String studioId) {
         Studio studio = findStudioAndVerifyOwner(studioId, currentUser);
+        ensureStudioCanBeDeleted(studioId);
         studioRepository.delete(studio);
         log.info("Studio deleted: {}", studioId);
     }
@@ -116,22 +126,15 @@ public class StudioServiceImpl {
     public PageResponse<StudioResponse> getAllStudios(
             String location, Integer maxPrice, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        
-        Page<Studio> studios = studioRepository.findAll(pageable);
-        
-        // Filter in memory
-        List<StudioResponse> filtered = studios.stream()
-                .filter(s -> location == null || s.getLocation().toLowerCase().contains(location.toLowerCase()))
-                .filter(s -> maxPrice == null || s.getPricing() <= maxPrice)
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-        
+
+        Specification<Studio> spec = Specification
+                .where(StudioSpecifications.locationContains(location))
+                .and(StudioSpecifications.pricingAtMost(maxPrice));
+
+        Page<Studio> studios = studioRepository.findAll(spec, pageable);
+
         return PageResponse.from(
-                new org.springframework.data.domain.PageImpl<>(
-                        filtered,
-                        pageable,
-                        studios.getTotalElements()
-                )
+                studios.map(this::toResponse)
         );
     }
 
@@ -176,6 +179,24 @@ public class StudioServiceImpl {
             throw StudioosException.forbidden("You do not own this studio");
         }
         return studio;
+    }
+
+    private void ensureStudioCanBeDeleted(String studioId) {
+        if (beatRepository.existsByStudioId(studioId)) {
+            throw StudioosException.badRequest("Studio has beats and cannot be deleted");
+        }
+        if (bookingRepository.existsByStudioId(studioId)) {
+            throw StudioosException.badRequest("Studio has bookings and cannot be deleted");
+        }
+        if (adCampaignRepository.existsByStudioId(studioId)) {
+            throw StudioosException.badRequest("Studio has ad campaigns and cannot be deleted");
+        }
+        if (transactionRepository.existsByStudioId(studioId)) {
+            throw StudioosException.badRequest("Studio has transactions and cannot be deleted");
+        }
+        if (withdrawalRepository.existsByStudioId(studioId)) {
+            throw StudioosException.badRequest("Studio has withdrawals and cannot be deleted");
+        }
     }
 
     private StudioResponse toResponse(Studio studio) {

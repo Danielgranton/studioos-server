@@ -8,6 +8,7 @@ import com.studioos.server.booking.BookingRepository;
 import com.studioos.server.payment.dto.StkPushInitiationResult;
 import com.studioos.server.shared.enums.AuditEventType;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
+import com.studioos.server.shared.enums.BookingStatus;
 import com.studioos.server.shared.enums.TransactionStatus;
 import com.studioos.server.shared.enums.TransactionType;
 import com.studioos.server.shared.events.TransactionResolvedEvent;
@@ -26,9 +27,17 @@ public class PaymentService {
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public Transaction initiateBookingPayment(String bookingId, String phoneNumber) {
+    public Transaction initiateBookingPayment(Integer requesterId, String bookingId, String phoneNumber) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found: " + bookingId));
+
+        if (!booking.getArtistId().equals(requesterId)) {
+            throw new SecurityException("You cannot pay for this booking");
+        }
+
+        if (booking.getStatus() != BookingStatus.APPROVED) {
+            throw new IllegalStateException("Booking " + bookingId + " must be approved before payment");
+        }
 
         if (booking.getPaymentStatus() == BookingPaymentStatus.PAID) {
             throw new IllegalStateException("Booking " + bookingId + " is already fully paid");

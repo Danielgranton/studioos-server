@@ -26,6 +26,9 @@ public class AuthService {
     // ─── STEP 1: Register — collect user info, send OTP ───
     @Transactional
     public OtpSentResponse register(RegisterRequest request) {
+        if (request.getRole() == null || request.getRole() == com.studioos.server.shared.enums.Role.SUPER_ADMIN) {
+            throw StudioosException.forbidden("Cannot self-register as a super admin");
+        }
         if (userRepository.existsByEmail(request.getEmail())) {
             throw StudioosException.conflict("Email already in use");
         }
@@ -113,6 +116,9 @@ public class AuthService {
     // ─── Refresh token ───
     public AuthResponse refreshToken(RefreshTokenRequest request) {
         final String email = jwtService.extractEmail(request.getRefreshToken());
+        if (!jwtService.isTokenOfType(request.getRefreshToken(), JwtService.TOKEN_TYPE_REFRESH)) {
+            throw StudioosException.unauthorized("Invalid refresh token");
+        }
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> StudioosException.notFound("User not found"));

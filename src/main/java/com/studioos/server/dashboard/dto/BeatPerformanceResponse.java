@@ -12,6 +12,7 @@ public class BeatPerformanceResponse {
     private String title;
     private String status;
     private String coverUrl;
+    private String thumbnailUrl;
     private Integer playCount;
     private Integer downloadCount;
     private Integer likeCount;

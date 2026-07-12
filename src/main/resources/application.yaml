@@ -1,4 +1,7 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   application:
     name: studioos-server
 
@@ -83,7 +86,27 @@ jwt:
 
 internal:
   service:
-    api-key: ${INTERNAL_SERVICE_API_KEY}
+    api-key: ${INTERNAL_SERVICE_API_KEY:}
+
+media:
+  service:
+    host: ${MEDIA_SERVICE_HOST:localhost}
+    port: ${MEDIA_SERVICE_PORT:50051}
+  callback:
+    grpc:
+      enabled: ${MEDIA_CALLBACK_GRPC_ENABLED:true}
+      host: ${MEDIA_CALLBACK_GRPC_HOST:0.0.0.0}
+      port: ${MEDIA_CALLBACK_GRPC_PORT:50052}
+
+storage:
+  s3:
+    enabled: ${S3_ENABLED:false}
+    region: ${AWS_REGION:eu-north-1}
+    access-key-id: ${AWS_ACCESS_KEY:}
+    secret-access-key: ${AWS_SECRET_KEY:}
+    bucket: ${AWS_BUCKET_NAME:}
+    endpoint-url: ${AWS_S3_ENDPOINT_URL:}
+    path-style-access: ${AWS_S3_PATH_STYLE:false}
     
 # ─── MPESA (Daraja API) ───
 mpesa:
@@ -95,6 +118,11 @@ mpesa:
   callback-url: ${MPESA_CALLBACK_URL}
   timeout-url: ${MPESA_TIMEOUT_URL}
 
+# ─── AFRICA'S TALKING ───
+africastalking:
+  username: ${AFRICASTALKING_USERNAME:${AT_USERNAME:}}
+  apikey: ${AFRICASTALKING_API_KEY:${AT_API_KEY:}}
+  sender-id: ${AFRICASTALKING_SENDER_ID:${AT_SENDER_ID:}}
 
 # ─── PLATFORM ───
 platform:

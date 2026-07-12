@@ -38,6 +38,12 @@ public class Otp {
     @Builder.Default
     private boolean used = false;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer failedAttempts = 0;
+
+    private LocalDateTime lockedUntil;
+
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

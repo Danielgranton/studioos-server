@@ -53,7 +53,8 @@ public class BookingController {
         @PathVariable String bookingId,
         @Valid @RequestBody InitiatePaymentRequest request
     ) {
-        Transaction transaction = paymentService.initiateBookingPayment(bookingId, request.getPhoneNumber());
+        Transaction transaction = paymentService.initiateBookingPayment(
+                currentUser.getId(), bookingId, request.getPhoneNumber());
         PaymentInitiationResponse response = PaymentInitiationResponse.builder()
                             .transactionId(transaction.getId())
                             .status(transaction.getStatus().name())

@@ -11,6 +11,7 @@ public class BeatSummaryResponse {
     private String id;
     private String title;
     private String coverUrl;
+    private String thumbnailUrl;
     private String genreName;
     private Integer startingPrice;   // cheapest active license price, null if no licenses yet
     private Integer likeCount;

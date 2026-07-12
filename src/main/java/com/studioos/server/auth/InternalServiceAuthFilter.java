@@ -5,6 +5,7 @@ import java.io.IOException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import jakarta.servlet.FilterChain;
@@ -35,7 +36,9 @@ public class InternalServiceAuthFilter extends OncePerRequestFilter {
 
         if (request.getRequestURI().contains("/internal/")) {
             String providedKey = request.getHeader("X-Internal-Api-Key");
-            if (providedKey == null || !providedKey.equals(expectedApiKey)) {
+            if (!StringUtils.hasText(expectedApiKey)
+                    || providedKey == null
+                    || !providedKey.equals(expectedApiKey)) {
                 log.warn("Rejected internal endpoint call with invalid/missing API key: {}", request.getRequestURI());
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
                 return;

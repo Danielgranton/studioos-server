@@ -3,6 +3,7 @@ package com.studioos.server.notification;
 import com.africastalking.AfricasTalking;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 @Component
 public class AfricasTalkingConfig {
@@ -14,6 +15,10 @@ public class AfricasTalkingConfig {
 
     @PostConstruct
     public void init() {
-        AfricasTalking.initialize(properties.getUsername(),properties.getApikey());
+        if (!StringUtils.hasText(properties.getUsername()) || !StringUtils.hasText(properties.getApikey())) {
+            return;
+        }
+
+        AfricasTalking.initialize(properties.getUsername(), properties.getApikey());
     }
 }

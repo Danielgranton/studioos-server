@@ -55,6 +55,16 @@ studioos
 
 The app starts on `http://localhost:8080/api` by default (Tomcat + `/api` context path).
 
+### Media service
+
+When the Java server is run with the `grpc-enabled` profile, it connects to the C++ media service on `localhost:50051` by default.
+
+```bash
+export $(cat .env | xargs) && ./mvnw spring-boot:run -Dspring-boot.run.profiles=grpc-enabled
+```
+
+Override `MEDIA_SERVICE_HOST` or `MEDIA_SERVICE_PORT` only if the media server runs elsewhere.
+
 ---
 
 ## Database Migrations (Flyway)

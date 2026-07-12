@@ -22,6 +22,9 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class JwtService {
 
+    public static final String TOKEN_TYPE_ACCESS = "access";
+    public static final String TOKEN_TYPE_REFRESH = "refresh";
+
     @Value("${jwt.secret}")
     private String secret;
 
@@ -36,11 +39,15 @@ public class JwtService {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", user.getRole().name());
         claims.put("userId", user.getId());
+        claims.put("tokenType", TOKEN_TYPE_ACCESS);
         return buildToken(claims, user.getEmail(), expiration);
     }
 
     public String generateRefreshToken(User user) {
-        return buildToken(new HashMap<>(), user.getEmail(), refreshExpiration);
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("tokenType", TOKEN_TYPE_REFRESH);
+        claims.put("tokenVersion", user.getRefreshTokenVersion() == null ? 0 : user.getRefreshTokenVersion());
+        return buildToken(claims, user.getEmail(), refreshExpiration);
     }
 
     private String buildToken(Map<String, Object> claims, String subject, long expiry) {
@@ -74,6 +81,18 @@ public class JwtService {
 
     public String extractRole(String token) {
         return extractClaim(token, claims -> claims.get("role", String.class));
+    }
+
+    public String extractTokenType(String token) {
+        return extractClaim(token, claims -> claims.get("tokenType", String.class));
+    }
+
+    public Integer extractTokenVersion(String token) {
+        return extractClaim(token, claims -> claims.get("tokenVersion", Integer.class));
+    }
+
+    public boolean isTokenOfType(String token, String expectedType) {
+        return expectedType.equals(extractTokenType(token));
     }
 
     private Date extractExpiration(String token) {

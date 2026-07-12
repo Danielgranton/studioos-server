@@ -72,6 +72,51 @@ public class WalletService {
     }
 
     /**
+     * Reserves available balance for an in-flight withdrawal.
+     */
+    @Transactional
+    public Wallet reserveForWithdrawal(String walletId, int amount) {
+        Wallet wallet = getWalletOrThrow(walletId);
+        if (wallet.getAvailableBalance() < amount) {
+            throw new IllegalStateException(
+                    "Insufficient available balance: has " + wallet.getAvailableBalance() + ", needs " + amount);
+        }
+        wallet.setAvailableBalance(wallet.getAvailableBalance() - amount);
+        wallet.setReservedBalance(wallet.getReservedBalance() + amount);
+        return walletRepository.save(wallet);
+    }
+
+    /**
+     * Commits a reserved withdrawal after M-Pesa confirms success.
+     */
+    @Transactional
+    public Wallet commitReservedWithdrawal(String walletId, int amount) {
+        Wallet wallet = getWalletOrThrow(walletId);
+        if (wallet.getReservedBalance() < amount) {
+            throw new IllegalStateException(
+                    "Cannot commit " + amount + " — reserved balance is only " + wallet.getReservedBalance());
+        }
+        wallet.setReservedBalance(wallet.getReservedBalance() - amount);
+        wallet.setWithdrawnBalance(wallet.getWithdrawnBalance() + amount);
+        return walletRepository.save(wallet);
+    }
+
+    /**
+     * Releases a reserved withdrawal back to available balance.
+     */
+    @Transactional
+    public Wallet releaseReservedWithdrawal(String walletId, int amount) {
+        Wallet wallet = getWalletOrThrow(walletId);
+        if (wallet.getReservedBalance() < amount) {
+            throw new IllegalStateException(
+                    "Cannot release " + amount + " — reserved balance is only " + wallet.getReservedBalance());
+        }
+        wallet.setReservedBalance(wallet.getReservedBalance() - amount);
+        wallet.setAvailableBalance(wallet.getAvailableBalance() + amount);
+        return walletRepository.save(wallet);
+    }
+
+    /**
      * Credits available balance directly (e.g. commission to platform wallet,
      * beat purchase payout — no pending stage involved).
      */

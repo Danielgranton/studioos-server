@@ -54,6 +54,7 @@ public class Beat {
     private String mood;
 
     private String coverUrl;
+    private String thumbnailUrl;
     private String audioUrl;
     private String previewUrl;
     private String waveformUrl;

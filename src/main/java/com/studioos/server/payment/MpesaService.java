@@ -114,10 +114,11 @@ public class MpesaService {
 
             int resultCode = stkCallback.path("ResultCode").asInt(-1);
             boolean success = resultCode == 0;
+            String checkoutRequestId = stkCallback.path("CheckoutRequestID").asText(null);
 
             if (!success) {
                 return new MpesaCallbackResult(false, null, 0,
-                        stkCallback.path("ResultDesc").asText(), null);
+                        stkCallback.path("ResultDesc").asText(), checkoutRequestId);
             }
 
             JsonNode items = stkCallback.path("CallbackMetadata").path("Item");
@@ -133,7 +134,6 @@ public class MpesaService {
                 }
             }
 
-            String checkoutRequestId = stkCallback.path("CheckoutRequestID").asText();
             return new MpesaCallbackResult(true, receipt, amount, "Success", checkoutRequestId);
         } catch (Exception e) {
             log.error("Failed to parse STK callback: {}", e.getMessage());
@@ -194,10 +194,11 @@ public class MpesaService {
 
             int resultCode = result.path("ResultCode").asInt(-1);
             boolean success = resultCode == 0;
+            String occasion = result.path("Occasion").asText(null);
 
             if (!success) {
                 return new MpesaCallbackResult(false, null, 0,
-                        result.path("ResultDesc").asText(), null);
+                        result.path("ResultDesc").asText(), occasion);
             }
 
             JsonNode items = result.path("ResultParameters").path("ResultParameter");
@@ -212,10 +213,6 @@ public class MpesaService {
                     amount = item.path("Value").asInt();
                 }
             }
-
-            String occasion = result.path("Occasion") != null
-                    ? result.path("Occasion").asText(null)
-                    : null;
 
             return new MpesaCallbackResult(true, receipt, amount, "Success", occasion);
         } catch (Exception e) {

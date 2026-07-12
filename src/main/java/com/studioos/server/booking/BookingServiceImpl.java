@@ -14,6 +14,7 @@ import com.studioos.server.booking.dto.ConfirmBookingRequest;
 import com.studioos.server.booking.dto.CreateBookingRequest;
 import com.studioos.server.notification.NotificationServiceImpl;
 import com.studioos.server.notification.dto.CreateNotificationRequest;
+import com.studioos.server.payment.EscrowService;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
@@ -34,6 +35,7 @@ public class BookingServiceImpl {
 
     private final BookingRepository bookingRepository;
     private final StudioRepository studioRepository;
+    private final EscrowService escrowService;
     private final NotificationServiceImpl notificationService;
 
     // ─── Create booking (ARTIST only) ───
@@ -115,8 +117,19 @@ public class BookingServiceImpl {
             throw StudioosException.forbidden("You cannot cancel this booking");
         }
 
+        if (booking.getStatus() == BookingStatus.RECORDING
+                || booking.getStatus() == BookingStatus.MIXING
+                || booking.getStatus() == BookingStatus.READY
+                || booking.getStatus() == BookingStatus.DELIVERED) {
+            throw StudioosException.badRequest("This booking is already in progress or completed");
+        }
+
         if (booking.getStatus() == BookingStatus.CANCELLED) {
             throw StudioosException.badRequest("Booking is already cancelled");
+        }
+
+        if (booking.getPaymentStatus() == BookingPaymentStatus.PAID) {
+            escrowService.refundEscrow(booking.getId());
         }
 
         booking.setStatus(BookingStatus.CANCELLED);

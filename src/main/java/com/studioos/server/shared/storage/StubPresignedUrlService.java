@@ -1,10 +1,13 @@
 package com.studioos.server.shared.storage;
 
-import org.springframework.context.annotation.Profile;
+import java.time.Instant;
+import java.util.Optional;
+
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 @Service
-@Profile("!s3-enabled")
+@ConditionalOnProperty(name = "storage.s3.enabled", havingValue = "false", matchIfMissing = true)
 public class StubPresignedUrlService implements PresignedUrlService {
 
     @Override
@@ -18,7 +21,7 @@ public class StubPresignedUrlService implements PresignedUrlService {
     }
 
     @Override
-    public boolean objectExists(String bucket, String objectKey) {
-        return true;
+    public Optional<StorageObjectMetadata> objectMetadata(String bucket, String objectKey) {
+        return Optional.of(new StorageObjectMetadata(1L, null, "stub", Instant.now()));
     }
 }
