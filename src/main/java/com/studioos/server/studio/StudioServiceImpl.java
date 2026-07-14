@@ -3,6 +3,7 @@ package com.studioos.server.studio;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +16,9 @@ import com.studioos.server.advertisement.campaign.AdCampaignRepository;
 import com.studioos.server.booking.BookingRepository;
 import com.studioos.server.booking.Booking;
 import com.studioos.server.beatmarketplace.BeatRepository;
+import com.studioos.server.search.event.StudioCreatedEvent;
+import com.studioos.server.search.event.StudioDeletedEvent;
+import com.studioos.server.search.event.StudioUpdatedEvent;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
@@ -41,6 +45,7 @@ public class StudioServiceImpl {
     private final AdCampaignRepository adCampaignRepository;
     private final com.studioos.server.payment.TransactionRepository transactionRepository;
     private final com.studioos.server.payment.WithdrawalRepository withdrawalRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     // ─── Create studio (PRODUCER only) ───
    @Transactional
@@ -76,6 +81,7 @@ public class StudioServiceImpl {
             }
 
             log.info("Studio created: {} by user: {}", studio.getStudioName(), currentUser.getEmail());
+            applicationEventPublisher.publishEvent(new StudioCreatedEvent(studio.getId()));
             return toResponse(studio);
         }
 
@@ -106,6 +112,7 @@ public class StudioServiceImpl {
 
         studioRepository.save(studio);
         log.info("Studio updated: {}", studioId);
+        applicationEventPublisher.publishEvent(new StudioUpdatedEvent(studio.getId()));
         return toResponse(studio);
     }
 
@@ -116,6 +123,7 @@ public class StudioServiceImpl {
         ensureStudioCanBeDeleted(studioId);
         studioRepository.delete(studio);
         log.info("Studio deleted: {}", studioId);
+        applicationEventPublisher.publishEvent(new StudioDeletedEvent(studioId));
     }
 
     // ─── Get single studio ───
@@ -234,7 +242,7 @@ public class StudioServiceImpl {
                 .ownerId(studio.getOwnerId())
                 .ownerName(studio.getOwner() != null ? studio.getOwner().getName() : null)
                 .services(studio.getServices().stream()
-                        .map(StudioService::getName)
+                        .map(s -> s.getName())
                         .collect(Collectors.toList()))
                 .averageRating(avgRating)
                 .totalRatings(totalRatings)

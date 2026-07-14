@@ -69,6 +69,12 @@ spring:
     deserialization:
       fail-on-unknown-properties: false
 
+  # ─── REDIS ───
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
 # ─── SERVER ───
 server:
   port: ${PORT:8080}
@@ -129,6 +135,10 @@ platform:
   commission-rate: ${COMMISSION_RATE:0.10}      # 10% default
   currency: KES
   mixing-deadline-days: 7
+
+opensearch:
+  host: ${OPENSEARCH_HOST}
+  port: ${OPENSEARCH_PORT}
 
 # ─── ACTUATOR ───
 management:

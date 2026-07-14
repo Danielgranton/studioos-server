@@ -2,6 +2,8 @@ package com.studioos.server.advertisement;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import com.studioos.server.search.event.AdvertisementPublishedEvent;
 import com.studioos.server.shared.enums.AdCreativeStatus;
 import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.exceptions.StudioosException;
@@ -14,6 +16,7 @@ public class AdReviewService {
 
     private final AdvertisementRepository advertisementRepository;
     private final AdNotificationService adNotificationService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Transactional
     public void approve(User admin, String advertisementId) {
@@ -21,6 +24,7 @@ public class AdReviewService {
         ad.setStatus(AdCreativeStatus.READY);
         advertisementRepository.save(ad);
         adNotificationService.notifyAdApproved(ad);
+        applicationEventPublisher.publishEvent(new AdvertisementPublishedEvent(ad.getId()));
     }
 
     @Transactional

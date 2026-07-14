@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.studioos.server.beatmarketplace.dto.BeatReviewResponse;
 import com.studioos.server.beatmarketplace.dto.SubmitReviewRequest;
 import com.studioos.server.shared.enums.BeatPaymentStatus;
-import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.exceptions.StudioosException;
 
 import lombok.RequiredArgsConstructor;

@@ -23,7 +23,6 @@ import com.studioos.server.dashboard.dto.BeatPerformanceResponse;
 import com.studioos.server.dashboard.dto.ProducerDashboardResponse;
 import com.studioos.server.reviews.ProducerReview;
 import com.studioos.server.reviews.ProducerReviewRepository;
-import com.studioos.server.payment.Wallet;
 import com.studioos.server.payment.WalletRepository;
 import com.studioos.server.shared.enums.BeatPaymentStatus;
 import com.studioos.server.shared.enums.BeatStatus;
@@ -55,7 +54,7 @@ public class ProducerDashboardService {
 
         // ─── Beat marketplace ───
         List<Beat> beats = beatRepository.findByProducerId(producerId);
-        List<String> beatIds = beats.stream().map(Beat::getId).toList();
+        List<String> beatIds = beats.stream().map(b -> b.getId()).toList();
 
         long totalBeats = beats.size();
         long publishedBeats = beats.stream().filter(b -> b.getStatus() == BeatStatus.READY).count();
@@ -70,17 +69,17 @@ public class ProducerDashboardService {
                 : beatPurchaseRepository.findByBeatIdInAndStatus(beatIds, BeatPaymentStatus.PAID);
 
         long totalSales = paidPurchases.size();
-        int beatRevenue = paidPurchases.stream().mapToInt(BeatPurchase::getAmount).sum();
+        int beatRevenue = paidPurchases.stream().mapToInt(b -> b.getAmount()).sum();
         int monthlyBeatRevenue = paidPurchases.stream()
                 .filter(p -> p.getPurchasedAt() != null && !p.getPurchasedAt().isBefore(monthStart))
-                .mapToInt(BeatPurchase::getAmount)
+                .mapToInt(b -> b.getAmount())
                 .sum();
 
         List<BeatReview> reviews = beatIds.isEmpty() ? List.of() : beatReviewRepository.findByBeatIdIn(beatIds);
         List<ProducerReview> producerReviews = producerReviewRepository.findByProducerId(producerId);
         Double averageRating = producerReviews.isEmpty()
                 ? null
-                : producerReviews.stream().mapToDouble(ProducerReview::getRating).average().orElse(0.0);
+                : producerReviews.stream().mapToDouble(p -> p.getRating()).average().orElse(0.0);
 
         Double conversionRate = totalPlays == 0 ? null : (double) totalSales / totalPlays;
 
@@ -88,9 +87,9 @@ public class ProducerDashboardService {
                 .max(Comparator.comparingInt(b -> nullToZero(b.getPlayCount())));
 
         Map<String, List<BeatPurchase>> purchasesByBeat = paidPurchases.stream()
-                .collect(Collectors.groupingBy(BeatPurchase::getBeatId));
+                .collect(Collectors.groupingBy(b -> b.getBeatId()));
         Map<String, List<BeatReview>> reviewsByBeat = reviews.stream()
-                .collect(Collectors.groupingBy(BeatReview::getBeatId));
+                .collect(Collectors.groupingBy(b -> b.getBeatId()));
 
         List<BeatPerformanceResponse> beatBreakdown = beats.stream()
                 .map(beat -> toBeatPerformance(beat, purchasesByBeat, reviewsByBeat))
@@ -98,7 +97,7 @@ public class ProducerDashboardService {
 
         // ─── Studio bookings ───
         List<Studio> studios = studioRepository.findByOwnerId(producerId);
-        List<String> studioIds = studios.stream().map(Studio::getId).toList();
+        List<String> studioIds = studios.stream().map(s -> s.getId()).toList();
 
         List<Booking> allBookings = studioIds.isEmpty()
                 ? List.of()
@@ -131,8 +130,8 @@ public class ProducerDashboardService {
                 ? null
                 : studioIds.stream()
                         .map(walletRepository::findByStudioId)
-                        .filter(Optional::isPresent)
-                        .map(Optional::get)
+                        .filter(o -> o.isPresent())
+                        .map(o -> o.get())
                         .mapToInt(w -> nullToZero(w.getAvailableBalance()))
                         .sum();
 
@@ -148,8 +147,8 @@ public class ProducerDashboardService {
                 .monthlyBeatRevenue(monthlyBeatRevenue)
                 .averageRating(averageRating)
                 .conversionRate(conversionRate)
-                .topBeatId(topBeat.map(Beat::getId).orElse(null))
-                .topBeatTitle(topBeat.map(Beat::getTitle).orElse(null))
+                .topBeatId(topBeat.map(b -> b.getId()).orElse(null))
+                .topBeatTitle(topBeat.map(b -> b.getTitle()).orElse(null))
                 .beatBreakdown(beatBreakdown)
                 .totalBookings(totalBookings)
                 .upcomingBookings(upcomingBookings)
@@ -171,11 +170,11 @@ public class ProducerDashboardService {
         List<BeatReview> beatReviews = reviewsByBeat.getOrDefault(beat.getId(), List.of());
 
         long salesCount = beatPurchases.size();
-        int revenue = beatPurchases.stream().mapToInt(BeatPurchase::getAmount).sum();
+        int revenue = beatPurchases.stream().mapToInt(b -> b.getAmount()).sum();
 
         Double averageRating = beatReviews.isEmpty()
                 ? null
-                : beatReviews.stream().mapToInt(BeatReview::getRating).average().orElse(0.0);
+                : beatReviews.stream().mapToInt(b -> b.getRating()).average().orElse(0.0);
 
         return BeatPerformanceResponse.builder()
                 .beatId(beat.getId())

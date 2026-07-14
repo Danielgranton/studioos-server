@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +18,8 @@ import com.studioos.server.beatmarketplace.dto.MediaJobCallbackRequest;
 import com.studioos.server.beatmarketplace.dto.RefreshUploadSessionResponse;
 import com.studioos.server.notification.NotificationServiceImpl;
 import com.studioos.server.notification.dto.CreateNotificationRequest;
+import com.studioos.server.search.event.BeatCreatedEvent;
+import com.studioos.server.search.event.BeatUpdatedEvent;
 import com.studioos.server.shared.enums.BeatStatus;
 import com.studioos.server.shared.enums.MediaJobOperation;
 import com.studioos.server.shared.enums.MediaJobStatus;
@@ -51,6 +55,7 @@ public class BeatService {
     private final PresignedUrlService presignedUrlService;
     private final MediaProcessingClient mediaProcessingClient;
     private final NotificationServiceImpl notificationService;
+    private final ApplicationEventPublisher applicationEventPublisher;
     @Value("${storage.s3.bucket}")
     private String mediaBucket;
 
@@ -89,6 +94,7 @@ public class BeatService {
                 .build();
 
         beat = beatRepository.save(beat);
+        applicationEventPublisher.publishEvent(new BeatCreatedEvent(beat.getId()));
 
         String audioKey = "%s/beat_%s_original.mp3".formatted(BEAT_UPLOAD_PREFIX, beat.getId());
         String coverKey = "%s/cover_%s_original.jpg".formatted(BEAT_UPLOAD_PREFIX, beat.getId());
@@ -177,6 +183,7 @@ public class BeatService {
 
         beat.setStatus(BeatStatus.PROCESSING);
         beat = beatRepository.save(beat);
+        applicationEventPublisher.publishEvent(new BeatUpdatedEvent(beat.getId()));
 
         submitProcessingJobs(beat, audioSession, coverSession);
 
@@ -370,6 +377,7 @@ public class BeatService {
 
             beat.setStatus(BeatStatus.READY);
             beatRepository.save(beat);
+            applicationEventPublisher.publishEvent(new BeatUpdatedEvent(beat.getId()));
             notifyProducer(
                     beat.getProducerId(),
                     NotificationType.BEAT_PROCESSING_COMPLETED,

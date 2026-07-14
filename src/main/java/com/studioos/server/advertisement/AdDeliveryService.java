@@ -50,9 +50,9 @@ public class AdDeliveryService {
                 .toList();
         
         List<EligibleAd> eligible = candidates.stream()
-        .map(c -> resolveEligibleAd(c, userId, now))
-        .flatMap(Optional::stream)
-        .toList();
+                .map(c -> resolveEligibleAd(c, userId, now))
+                .flatMap(Optional::stream)
+                .toList();
 
         if (eligible.isEmpty()) {
             return Optional.empty();
