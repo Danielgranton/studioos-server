@@ -12,6 +12,7 @@ import com.studioos.server.advertisement.campaign.AdBudget;
 import com.studioos.server.advertisement.campaign.AdBudgetRepository;
 import com.studioos.server.advertisement.campaign.AdCampaign;
 import com.studioos.server.advertisement.campaign.AdCampaignRepository;
+import com.studioos.server.advertisement.targeting.TargetingService;
 import com.studioos.server.advertisement.dto.AdDeliveryResponse;
 import com.studioos.server.advertisement.pricing.AdvertisementPricing;
 import com.studioos.server.advertisement.pricing.AdvertisementPricingRepository;
@@ -37,6 +38,7 @@ public class AdDeliveryService {
     private final AdvertisementPricingRepository advertisementPricingRepository;
     private final AdImpressionRepository adImpressionRepository;
     private final PresignedUrlService presignedUrlService;
+    private final TargetingService targetingService;
 
     @Transactional
     public Optional<AdDeliveryResponse> selectAdvertisement(AdPlacement placement, Integer userId) {
@@ -47,11 +49,12 @@ public class AdDeliveryService {
                 .filter(c -> c.getStatus() == AdCampaignStatus.ACTIVE)
                 .filter(c -> c.getPlacement() == placement)
                 .filter(c -> !c.getStartDate().isAfter(now) && !c.getEndDate().isBefore(now))
+                .filter(c -> targetingService.matchesUser(c.getId(), userId))
                 .toList();
         
         List<EligibleAd> eligible = candidates.stream()
                 .map(c -> resolveEligibleAd(c, userId, now))
-                .flatMap(Optional::stream)
+                .flatMap(o -> o.stream())
                 .toList();
 
         if (eligible.isEmpty()) {

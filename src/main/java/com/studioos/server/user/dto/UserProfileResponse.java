@@ -23,6 +23,9 @@ public class UserProfileResponse {
     private String genre;
     private String experience;
     private String profileImage;
+    private String profileImageLarge;
+    private String profileImageMedium;
+    private String profileImageThumbnail;
     private String instagram;
     private String youtube;
     private String link;

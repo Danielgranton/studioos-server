@@ -20,6 +20,9 @@ public class StudioResponse {
     private String availability;
     private String description;
     private String profileImage;
+    private String profileImageLarge;
+    private String profileImageMedium;
+    private String profileImageThumbnail;
     private Integer ownerId;
     private String ownerName;
     private List<String> services;

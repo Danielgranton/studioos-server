@@ -17,4 +17,9 @@ public interface MediaProcessingClient {
      * Polls the current status of a previously submitted job.
      */
     MediaJobResult getJobStatus(String externalJobId);
+
+    /**
+     * Processes a responsive image and returns the generated URLs.
+     */
+    MediaResponsiveImageResult processResponsiveImage(String assetReference, String objectKeyPrefix, int quality);
 }

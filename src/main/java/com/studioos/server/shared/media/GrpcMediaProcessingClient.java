@@ -76,6 +76,20 @@ public class GrpcMediaProcessingClient implements MediaProcessingClient {
                 .build();
     }
 
+    @Override
+    public MediaResponsiveImageResult processResponsiveImage(String assetReference, String objectKeyPrefix, int quality) {
+        Media.ResponsiveImageRequest request = Media.ResponsiveImageRequest.newBuilder()
+                .setImagePath(assetReference)
+                .setObjectKeyPrefix(objectKeyPrefix == null ? "" : objectKeyPrefix)
+                .setQuality(quality)
+                .build();
+
+        Media.ResponsiveImageResponse response = MediaServiceGrpc.newBlockingStub(channel)
+                .processResponsiveImage(request);
+
+        return mapResponsiveImage(response);
+    }
+
     @PreDestroy
     public void shutdown() throws InterruptedException {
         channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
@@ -98,5 +112,21 @@ public class GrpcMediaProcessingClient implements MediaProcessingClient {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    private MediaResponsiveImageResult mapResponsiveImage(Media.ResponsiveImageResponse response) {
+        if (response == null) {
+            return null;
+        }
+
+        return MediaResponsiveImageResult.builder()
+                .originalUrl(blankToNull(response.getOriginalUrl()))
+                .variants(response.getVariantsList().stream()
+                        .map(variant -> ResponsiveImageVariant.builder()
+                                .size(variant.getSize())
+                                .url(blankToNull(variant.getUrl()))
+                                .build())
+                        .toList())
+                .build();
     }
 }

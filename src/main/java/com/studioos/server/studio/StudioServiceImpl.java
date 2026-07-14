@@ -19,6 +19,8 @@ import com.studioos.server.beatmarketplace.BeatRepository;
 import com.studioos.server.search.event.StudioCreatedEvent;
 import com.studioos.server.search.event.StudioDeletedEvent;
 import com.studioos.server.search.event.StudioUpdatedEvent;
+import com.studioos.server.shared.media.ResponsiveImageAsset;
+import com.studioos.server.shared.media.ResponsiveImageProcessingService;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
@@ -46,6 +48,7 @@ public class StudioServiceImpl {
     private final com.studioos.server.payment.TransactionRepository transactionRepository;
     private final com.studioos.server.payment.WithdrawalRepository withdrawalRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final ResponsiveImageProcessingService responsiveImageProcessingService;
 
     // ─── Create studio (PRODUCER only) ───
    @Transactional
@@ -61,7 +64,6 @@ public class StudioServiceImpl {
                     .pricing(request.getPricing())
                     .availability(request.getAvailability())
                     .description(request.getDescription())
-                    .profileImage(request.getProfileImage())
                     .ownerId(currentUser.getId())
                     .build();
 
@@ -81,6 +83,8 @@ public class StudioServiceImpl {
             }
 
             log.info("Studio created: {} by user: {}", studio.getStudioName(), currentUser.getEmail());
+            applyProfileImage(studio, request.getProfileImage());
+            studioRepository.save(studio);
             applicationEventPublisher.publishEvent(new StudioCreatedEvent(studio.getId()));
             return toResponse(studio);
         }
@@ -95,7 +99,7 @@ public class StudioServiceImpl {
         if (request.getPricing() != null) studio.setPricing(request.getPricing());
         if (request.getAvailability() != null) studio.setAvailability(request.getAvailability());
         if (request.getDescription() != null) studio.setDescription(request.getDescription());
-        if (request.getProfileImage() != null) studio.setProfileImage(request.getProfileImage());
+        if (request.getProfileImage() != null) applyProfileImage(studio, request.getProfileImage());
 
         // ─── Replace services if provided ───
         if (request.getServices() != null) {
@@ -239,6 +243,9 @@ public class StudioServiceImpl {
                 .availability(studio.getAvailability())
                 .description(studio.getDescription())
                 .profileImage(studio.getProfileImage())
+                .profileImageLarge(studio.getProfileImageLarge())
+                .profileImageMedium(studio.getProfileImageMedium())
+                .profileImageThumbnail(studio.getProfileImageThumbnail())
                 .ownerId(studio.getOwnerId())
                 .ownerName(studio.getOwner() != null ? studio.getOwner().getName() : null)
                 .services(studio.getServices().stream()
@@ -248,5 +255,19 @@ public class StudioServiceImpl {
                 .totalRatings(totalRatings)
                 .createdAt(studio.getCreatedAt())
                 .build();
+    }
+
+    private void applyProfileImage(Studio studio, String profileImageReference) {
+        ResponsiveImageAsset image = responsiveImageProcessingService.process(
+                profileImageReference,
+                "studios/" + studio.getId() + "/profile");
+        if (image == null) {
+            return;
+        }
+
+        studio.setProfileImage(image.getOriginalUrl());
+        studio.setProfileImageLarge(image.getLargeUrl());
+        studio.setProfileImageMedium(image.getMediumUrl());
+        studio.setProfileImageThumbnail(image.getThumbnailUrl());
     }
 }

@@ -37,4 +37,18 @@ public class StubMediaProcessingClient implements MediaProcessingClient {
                 .errorMessage(null)
                 .build();
     }
+
+    @Override
+    public MediaResponsiveImageResult processResponsiveImage(String assetReference, String objectKeyPrefix, int quality) {
+        String base = "https://stub-media.local/responsive/" + UUID.randomUUID();
+        return MediaResponsiveImageResult.builder()
+                .originalUrl(base + "/original.webp")
+                .variants(java.util.List.of(
+                        ResponsiveImageVariant.builder().size(1024).url(base + "/1024.webp").build(),
+                        ResponsiveImageVariant.builder().size(512).url(base + "/512.webp").build(),
+                        ResponsiveImageVariant.builder().size(256).url(base + "/256.webp").build(),
+                        ResponsiveImageVariant.builder().size(128).url(base + "/128.webp").build(),
+                        ResponsiveImageVariant.builder().size(64).url(base + "/64.webp").build()))
+                .build();
+    }
 }

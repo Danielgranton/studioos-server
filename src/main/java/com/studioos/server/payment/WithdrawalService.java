@@ -8,7 +8,6 @@ import com.studioos.server.shared.enums.NotificationType;
 import com.studioos.server.shared.enums.TransactionStatus;
 import com.studioos.server.shared.enums.TransactionType;
 import com.studioos.server.shared.enums.WithdrawalStatus;
-import com.studioos.server.studio.Studio;
 import com.studioos.server.studio.StudioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -215,7 +214,7 @@ public class WithdrawalService {
 
     private Integer resolveOwnerId(String studioId) {
         return studioRepository.findById(studioId)
-                .map(Studio::getOwnerId)
+                .map(s -> s.getOwnerId())
                 .orElse(null);
     }
 

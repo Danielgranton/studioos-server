@@ -4,6 +4,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.studioos.server.shared.exceptions.StudioosException;
+import com.studioos.server.shared.media.ResponsiveImageAsset;
+import com.studioos.server.shared.media.ResponsiveImageProcessingService;
 import com.studioos.server.user.dto.PublicUserResponse;
 import com.studioos.server.user.dto.UpdateProfileRequest;
 import com.studioos.server.user.dto.UserProfileResponse;
@@ -17,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final ResponsiveImageProcessingService responsiveImageProcessingService;
 
     // ─── Get own profile ───
     public UserProfileResponse getMyProfile(User currentUser) {
@@ -33,7 +36,7 @@ public class UserService {
         if (request.getLocation() != null) user.setLocation(request.getLocation());
         if (request.getGenre() != null) user.setGenre(request.getGenre());
         if (request.getExperience() != null) user.setExperience(request.getExperience());
-        if (request.getProfileImage() != null) user.setProfileImage(request.getProfileImage());
+        if (request.getProfileImage() != null) applyProfileImage(user, request.getProfileImage());
         if (request.getInstagram() != null) user.setInstagram(request.getInstagram());
         if (request.getYoutube() != null) user.setYoutube(request.getYoutube());
         if (request.getLink() != null) user.setLink(request.getLink());
@@ -63,6 +66,9 @@ public class UserService {
                 .genre(user.getGenre())
                 .experience(user.getExperience())
                 .profileImage(user.getProfileImage())
+                .profileImageLarge(user.getProfileImageLarge())
+                .profileImageMedium(user.getProfileImageMedium())
+                .profileImageThumbnail(user.getProfileImageThumbnail())
                 .instagram(user.getInstagram())
                 .youtube(user.getYoutube())
                 .link(user.getLink())
@@ -80,9 +86,26 @@ public class UserService {
                 .genre(user.getGenre())
                 .experience(user.getExperience())
                 .profileImage(user.getProfileImage())
+                .profileImageLarge(user.getProfileImageLarge())
+                .profileImageMedium(user.getProfileImageMedium())
+                .profileImageThumbnail(user.getProfileImageThumbnail())
                 .instagram(user.getInstagram())
                 .youtube(user.getYoutube())
                 .link(user.getLink())
                 .build();
+    }
+
+    private void applyProfileImage(User user, String profileImageReference) {
+        ResponsiveImageAsset image = responsiveImageProcessingService.process(
+                profileImageReference,
+                "users/" + user.getId() + "/profile");
+        if (image == null) {
+            return;
+        }
+
+        user.setProfileImage(image.getOriginalUrl());
+        user.setProfileImageLarge(image.getLargeUrl());
+        user.setProfileImageMedium(image.getMediumUrl());
+        user.setProfileImageThumbnail(image.getThumbnailUrl());
     }
 }

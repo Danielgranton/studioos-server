@@ -39,6 +39,9 @@ public class Studio {
     private String description;
 
     private String profileImage;
+    private String profileImageLarge;
+    private String profileImageMedium;
+    private String profileImageThumbnail;
 
     // ─── Owner ───
     @Column(nullable = false)

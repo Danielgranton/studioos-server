@@ -69,6 +69,9 @@ public class User implements UserDetails {
 
     private String genre;
     private String profileImage;
+    private String profileImageLarge;
+    private String profileImageMedium;
+    private String profileImageThumbnail;
     private String experience;
 
     // ─── Social links ───

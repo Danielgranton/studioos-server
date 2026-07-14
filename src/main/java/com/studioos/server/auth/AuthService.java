@@ -5,6 +5,8 @@ import com.studioos.server.auth.otp.OtpService;
 import com.studioos.server.notification.EmailService;
 import com.studioos.server.notification.SmsService;
 import com.studioos.server.shared.exceptions.StudioosException;
+import com.studioos.server.shared.media.ResponsiveImageAsset;
+import com.studioos.server.shared.media.ResponsiveImageProcessingService;
 import com.studioos.server.user.User;
 import com.studioos.server.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final EmailService emailService;
     private final SmsService smsService;
+    private final ResponsiveImageProcessingService responsiveImageProcessingService;
 
     // ─── STEP 1: Register — collect user info, send OTP ───
     @Transactional
@@ -42,9 +45,11 @@ public class AuthService {
                 .email(request.getEmail())
                 .phone(request.getPhone())
                 .role(request.getRole())
-                .profileImage(request.getProfileImage())
                 .build();
 
+        userRepository.save(user);
+
+        applyProfileImage(user, request.getProfileImage());
         userRepository.save(user);
 
         // Generate OTP and send to both email and phone
@@ -166,5 +171,19 @@ public class AuthService {
     private String maskPhone(String phone) {
         if (phone == null) return null;
         return phone.substring(0, Math.min(4, phone.length())) + "****";
+    }
+
+    private void applyProfileImage(User user, String profileImageReference) {
+        ResponsiveImageAsset image = responsiveImageProcessingService.process(
+                profileImageReference,
+                "users/" + user.getId() + "/profile");
+        if (image == null) {
+            return;
+        }
+
+        user.setProfileImage(image.getOriginalUrl());
+        user.setProfileImageLarge(image.getLargeUrl());
+        user.setProfileImageMedium(image.getMediumUrl());
+        user.setProfileImageThumbnail(image.getThumbnailUrl());
     }
 }
