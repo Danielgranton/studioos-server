@@ -23,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.studioos.server.beatmarketplace.dto.BeatSearchRequest;
 import com.studioos.server.beatmarketplace.dto.BeatSummaryResponse;
 import com.studioos.server.user.UserRepository;
-import com.studioos.server.user.User;
 
 import lombok.RequiredArgsConstructor;
 
@@ -63,11 +62,11 @@ public class BeatBrowseService {
 
         Page<Beat> beats = beatRepository.findAll(spec, pageable);
 
-        List<String> beatIds = beats.getContent().stream().map(Beat::getId).collect(Collectors.toList());
+        List<String> beatIds = beats.getContent().stream().map(b -> b.getId()).collect(Collectors.toList());
         Map<String, Integer> minPrices = beatIds.isEmpty()
                 ? Map.of()
                 : beatLicenseRepository.findMinPricesByBeatIds(beatIds).stream()
-                        .collect(Collectors.toMap(BeatMinPriceProjection::getBeatId, BeatMinPriceProjection::getMinPrice));
+                        .collect(Collectors.toMap(b -> b.getBeatId(), b -> b.getMinPrice()));
 
         Map<Integer, String> producerNames = resolveProducerNames(beats.getContent());
 
@@ -90,25 +89,25 @@ public class BeatBrowseService {
             return Page.empty(PageRequest.of(page, size));
         }
 
-        List<String> beatIds = beats.stream().map(Beat::getId).toList();
+        List<String> beatIds = beats.stream().map(b -> b.getId()).toList();
         LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
         Map<String, Double> trendingScores = computeTrendingScores(beatIds, cutoff);
 
         List<Beat> sorted = new ArrayList<>(beats);
         sorted.sort(Comparator
                 .comparingDouble((Beat beat) -> trendingScores.getOrDefault(beat.getId(), 0.0)).reversed()
-                .thenComparing(Beat::getPlayCount, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(Beat::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
+                .thenComparing(b -> b.getPlayCount(), Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(b -> b.getCreatedAt(), Comparator.nullsLast(Comparator.reverseOrder())));
 
         int fromIndex = Math.min(page * size, sorted.size());
         int toIndex = Math.min(fromIndex + size, sorted.size());
         List<Beat> content = sorted.subList(fromIndex, toIndex);
 
-        List<String> pageBeatIds = content.stream().map(Beat::getId).collect(Collectors.toList());
+        List<String> pageBeatIds = content.stream().map(b -> b.getId()).collect(Collectors.toList());
         Map<String, Integer> minPrices = pageBeatIds.isEmpty()
                 ? Map.of()
                 : beatLicenseRepository.findMinPricesByBeatIds(pageBeatIds).stream()
-                        .collect(Collectors.toMap(BeatMinPriceProjection::getBeatId, BeatMinPriceProjection::getMinPrice));
+                        .collect(Collectors.toMap(b -> b.getBeatId(), b -> b.getMinPrice()));
 
         Map<Integer, String> producerNames = resolveProducerNames(content);
 
@@ -138,12 +137,12 @@ public class BeatBrowseService {
         }
 
         Set<Integer> producerIds = beats.stream()
-                .map(Beat::getProducerId)
+                .map(b ->b.getProducerId())
                 .collect(Collectors.toSet());
         return StreamSupport.stream(userRepository.findAllById(producerIds).spliterator(), false)
                 .collect(Collectors.toMap(
-                        User::getId,
-                        User::getName,
+                        u -> u.getId(),
+                        u -> u.getName(),
                         (left, right) -> left));
     }
 

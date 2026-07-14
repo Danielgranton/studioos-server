@@ -1,7 +1,6 @@
 package com.studioos.server.payment;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
@@ -10,9 +9,7 @@ import static org.mockito.Mockito.when;
 import java.util.Optional;
 
 import com.studioos.server.notification.NotificationServiceImpl;
-import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.enums.WithdrawalStatus;
-import com.studioos.server.studio.Studio;
 import com.studioos.server.studio.StudioRepository;
 import com.studioos.server.shared.enums.WalletType;
 

@@ -10,13 +10,11 @@ import java.util.Optional;
 
 import com.studioos.server.advertisement.campaign.AdBudgetRepository;
 import com.studioos.server.advertisement.campaign.AdCampaignRepository;
-import com.studioos.server.advertisement.AdNotificationService;
-import com.studioos.server.advertisement.dto.AdUploadCompleteResponse;
+
 import com.studioos.server.advertisement.pricing.AdvertisementPricingService;
 import com.studioos.server.shared.enums.AdCreativeStatus;
 import com.studioos.server.shared.enums.AdMediaJobOperation;
 import com.studioos.server.shared.enums.MediaJobStatus;
-import com.studioos.server.shared.enums.UploadSessionStatus;
 import com.studioos.server.shared.media.MediaJobResult;
 import com.studioos.server.shared.media.MediaProcessingClient;
 import com.studioos.server.shared.storage.PresignedUrlService;
