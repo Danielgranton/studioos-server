@@ -1,6 +1,5 @@
 package com.studioos.server.search.cache;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.studioos.server.search.dto.RecentSearchResponse;
 import com.studioos.server.search.dto.TrendingResponse;

@@ -3,6 +3,7 @@ package com.studioos.server.booking;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -12,13 +13,16 @@ import org.springframework.transaction.annotation.Transactional;
 import com.studioos.server.booking.dto.BookingResponse;
 import com.studioos.server.booking.dto.ConfirmBookingRequest;
 import com.studioos.server.booking.dto.CreateBookingRequest;
-import com.studioos.server.notification.NotificationServiceImpl;
-import com.studioos.server.notification.dto.CreateNotificationRequest;
+import com.studioos.server.booking.dto.PaymentInitiationResponse;
+import com.studioos.server.booking.events.BookingCancelledEvent;
+import com.studioos.server.booking.events.BookingConfirmedEvent;
+import com.studioos.server.booking.events.BookingCreatedEvent;
 import com.studioos.server.payment.EscrowService;
+import com.studioos.server.payment.PaymentService;
+import com.studioos.server.payment.Transaction;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
-import com.studioos.server.shared.enums.NotificationType;
 import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.studio.Studio;
@@ -35,8 +39,9 @@ public class BookingServiceImpl {
 
     private final BookingRepository bookingRepository;
     private final StudioRepository studioRepository;
+    private final PaymentService paymentService;
     private final EscrowService escrowService;
-    private final NotificationServiceImpl notificationService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     // ─── Create booking (ARTIST only) ───
     @Transactional
@@ -71,9 +76,22 @@ public class BookingServiceImpl {
         bookingRepository.save(booking);
         log.info("Booking created: {} by artist: {}", booking.getId(), currentUser.getEmail());
 
-        notifyBookingCreated(booking, studio, currentUser);
+        applicationEventPublisher.publishEvent(BookingCreatedEvent.builder()
+                .bookingId(booking.getId())
+                .studioId(booking.getStudioId())
+                .artistId(booking.getArtistId())
+                .build());
 
         return toResponse(booking, studio, currentUser);
+    }
+
+    @Transactional
+    public PaymentInitiationResponse initiatePayment(User currentUser, String bookingId, String phoneNumber) {
+        Transaction transaction = paymentService.initiateBookingPayment(currentUser.getId(), bookingId, phoneNumber);
+        return PaymentInitiationResponse.builder()
+                .transactionId(transaction.getId())
+                .status(transaction.getStatus().name())
+                .build();
     }
 
     // ─── Confirm booking (PRODUCER/STUDIO OWNER only) ───
@@ -98,7 +116,11 @@ public class BookingServiceImpl {
         bookingRepository.save(booking);
         log.info("Booking confirmed: {}", bookingId);
 
-        notifyBookingConfirmed(booking, studio);
+        applicationEventPublisher.publishEvent(BookingConfirmedEvent.builder()
+                .bookingId(booking.getId())
+                .studioId(booking.getStudioId())
+                .artistId(booking.getArtistId())
+                .build());
 
         return toResponse(booking, studio, currentUser);
     }
@@ -137,7 +159,13 @@ public class BookingServiceImpl {
         log.info("Booking cancelled: {}", bookingId);
 
         boolean cancelledByAdmin = currentUser.getRole() == Role.SUPER_ADMIN && !isArtist && !isStudioOwner;
-        notifyBookingCancelled(booking, studio, isArtist, cancelledByAdmin);
+        applicationEventPublisher.publishEvent(BookingCancelledEvent.builder()
+                .bookingId(booking.getId())
+                .studioId(booking.getStudioId())
+                .artistId(booking.getArtistId())
+                .cancelledByArtist(isArtist)
+                .cancelledByAdmin(cancelledByAdmin)
+                .build());
     }
 
     // ─── Get booking details ───
@@ -186,84 +214,6 @@ public class BookingServiceImpl {
                 bookingRepository.findByStudioId(studioId, pageable)
                         .map(b -> toResponse(b, studio, currentUser))
         );
-    }
-
-    // ─── Notifications ───
-
-    private void notifyBookingCreated(Booking booking, Studio studio, User artist) {
-        try {
-            notificationService.createNotification(buildRequest(
-                    studio.getOwnerId(),
-                    NotificationType.BOOKING_REQUEST,
-                    "New booking request",
-                    (artist.getName() != null ? artist.getName() : "An artist") + " requested a session at \""
-                            + studio.getStudioName() + "\".",
-                    booking.getId()
-            ));
-        } catch (Exception e) {
-            log.error("Failed to send booking-created notification for booking {}: {}", booking.getId(), e.getMessage());
-        }
-    }
-
-    private void notifyBookingConfirmed(Booking booking, Studio studio) {
-        try {
-            notificationService.createNotification(buildRequest(
-                    booking.getArtistId(),
-                    NotificationType.BOOKING_CONFIRMED,
-                    "Booking confirmed",
-                    "Your session at \"" + studio.getStudioName() + "\" has been confirmed.",
-                    booking.getId()
-            ));
-        } catch (Exception e) {
-            log.error("Failed to send booking-confirmed notification for booking {}: {}", booking.getId(), e.getMessage());
-        }
-    }
-
-    private void notifyBookingCancelled(Booking booking, Studio studio, boolean cancelledByArtist, boolean cancelledByAdmin) {
-        try {
-            String studioName = studio != null ? studio.getStudioName() : "the studio";
-
-            if (cancelledByAdmin) {
-                if (studio != null) {
-                    notificationService.createNotification(buildRequest(
-                            studio.getOwnerId(), NotificationType.BOOKING_CANCELLED,
-                            "Booking cancelled", "A booking at \"" + studioName + "\" was cancelled by an administrator.",
-                            booking.getId()));
-                }
-                notificationService.createNotification(buildRequest(
-                        booking.getArtistId(), NotificationType.BOOKING_CANCELLED,
-                        "Booking cancelled", "Your session at \"" + studioName + "\" was cancelled by an administrator.",
-                        booking.getId()));
-                return;
-            }
-
-            if (cancelledByArtist) {
-                if (studio != null) {
-                    notificationService.createNotification(buildRequest(
-                            studio.getOwnerId(), NotificationType.BOOKING_CANCELLED,
-                            "Booking cancelled", "An artist cancelled their session at \"" + studioName + "\".",
-                            booking.getId()));
-                }
-            } else {
-                notificationService.createNotification(buildRequest(
-                        booking.getArtistId(), NotificationType.BOOKING_CANCELLED,
-                        "Booking cancelled", "Your session at \"" + studioName + "\" was cancelled by the studio.",
-                        booking.getId()));
-            }
-        } catch (Exception e) {
-            log.error("Failed to send booking-cancelled notification for booking {}: {}", booking.getId(), e.getMessage());
-        }
-    }
-
-    private CreateNotificationRequest buildRequest(Integer userId, NotificationType type, String title,
-                                                    String message, String relatedEntityId) {
-        CreateNotificationRequest request = new CreateNotificationRequest();
-        request.setUserId(userId);
-        request.setType(type);
-        request.setTitle(title);
-        request.setMessage(message);
-        request.setRelatedEntityId(relatedEntityId);
-        return request;
     }
 
     // ─── Helper ───

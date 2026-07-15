@@ -7,12 +7,14 @@ import com.studioos.server.auth.dto.LoginRequest;
 import com.studioos.server.auth.dto.OtpSentResponse;
 import com.studioos.server.auth.dto.RefreshTokenRequest;
 import com.studioos.server.auth.dto.RegisterRequest;
+import com.studioos.server.auth.dto.SessionResponse;
 import com.studioos.server.auth.dto.VerifyOtpRequest;
 import com.studioos.server.auth.service.LoginService;
 import com.studioos.server.auth.service.RefreshTokenService;
 import com.studioos.server.auth.service.RegistrationService;
 import com.studioos.server.auth.service.SessionService;
 import com.studioos.server.auth.service.VerificationService;
+import com.studioos.server.user.User;
 
 import lombok.RequiredArgsConstructor;
 
@@ -52,5 +54,13 @@ public class AuthService {
 
     public void logout(com.studioos.server.auth.dto.LogoutRequest request) {
         sessionService.logout(request);
+    }
+
+    public java.util.List<SessionResponse> sessions(User user) {
+        return sessionService.listActiveSessions(user);
+    }
+
+    public void revokeSession(User user, String sessionId) {
+        sessionService.revokeSession(user, sessionId);
     }
 }

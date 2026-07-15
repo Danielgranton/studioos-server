@@ -8,14 +8,15 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-import com.studioos.server.notification.NotificationServiceImpl;
 import com.studioos.server.payment.EscrowService;
+import com.studioos.server.payment.PaymentService;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
 import com.studioos.server.shared.enums.Role;
 import com.studioos.server.studio.Studio;
 import com.studioos.server.studio.StudioRepository;
 import com.studioos.server.user.User;
+import org.springframework.context.ApplicationEventPublisher;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,9 +32,11 @@ class BookingServiceImplTest {
     @Mock
     private StudioRepository studioRepository;
     @Mock
+    private PaymentService paymentService;
+    @Mock
     private EscrowService escrowService;
     @Mock
-    private NotificationServiceImpl notificationService;
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks
     private BookingServiceImpl bookingService;

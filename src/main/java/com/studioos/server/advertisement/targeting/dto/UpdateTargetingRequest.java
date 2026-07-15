@@ -1,6 +1,5 @@
 package com.studioos.server.advertisement.targeting.dto;
 
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 

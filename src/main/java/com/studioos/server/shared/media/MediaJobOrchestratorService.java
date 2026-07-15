@@ -11,6 +11,8 @@ import com.studioos.server.advertisement.AdMediaProcessingJobRepository;
 import com.studioos.server.advertisement.AdvertisementUploadService;
 import com.studioos.server.beatmarketplace.BeatService;
 import com.studioos.server.beatmarketplace.MediaProcessingJobRepository;
+import com.studioos.server.session.DeliverableService;
+import com.studioos.server.session.SessionDeliverableProcessingJobRepository;
 import com.studioos.server.shared.enums.MediaJobStatus;
 
 import lombok.RequiredArgsConstructor;
@@ -27,8 +29,10 @@ public class MediaJobOrchestratorService {
     private final MediaProcessingClient mediaProcessingClient;
     private final MediaProcessingJobRepository beatJobRepository;
     private final AdMediaProcessingJobRepository adJobRepository;
+    private final SessionDeliverableProcessingJobRepository sessionDeliverableJobRepository;
     private final BeatService beatService;
     private final AdvertisementUploadService advertisementUploadService;
+    private final DeliverableService deliverableService;
 
     @Value("${media.job.stale-after-minutes:2}")
     private long staleAfterMinutes;
@@ -42,6 +46,9 @@ public class MediaJobOrchestratorService {
 
         adJobRepository.findByStatusInAndUpdatedAtBefore(IN_FLIGHT_STATUSES, cutoff)
                 .forEach(job -> syncAdJob(job.getExternalJobId()));
+
+        sessionDeliverableJobRepository.findByStatusInAndUpdatedAtBefore(IN_FLIGHT_STATUSES, cutoff)
+                .forEach(job -> syncSessionDeliverableJob(job.getExternalJobId()));
     }
 
     public void handleCallback(MediaProcessingCallbackRequest request) {
@@ -76,10 +83,21 @@ public class MediaJobOrchestratorService {
         }
     }
 
+    private void syncSessionDeliverableJob(String jobId) {
+        try {
+            dispatchResult(mediaProcessingClient.getJobStatus(jobId));
+        } catch (Exception e) {
+            log.warn("Session deliverable job poll failed for {}: {}", jobId, e.getMessage());
+        }
+    }
+
     private void dispatchResult(MediaJobResult result) {
         boolean handled = beatService.applyMediaJobResult(result);
         if (!handled) {
             handled = advertisementUploadService.applyMediaJobResult(result);
+        }
+        if (!handled) {
+            handled = deliverableService.applyMediaJobResult(result);
         }
 
         if (!handled) {

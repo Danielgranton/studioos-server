@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.studioos.server.booking.Booking;
 import com.studioos.server.booking.BookingRepository;
+import com.studioos.server.booking.events.BookingPaidEvent;
 import com.studioos.server.payment.dto.StkPushInitiationResult;
 import com.studioos.server.shared.enums.AuditEventType;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
@@ -107,6 +108,12 @@ public class PaymentService {
             bookingRepository.save(booking);
 
             escrowService.holdEscrow(booking, transaction);
+            eventPublisher.publishEvent(BookingPaidEvent.builder()
+                    .bookingId(booking.getId())
+                    .studioId(booking.getStudioId())
+                    .artistId(booking.getArtistId())
+                    .transactionId(transaction.getId())
+                    .build());
         }
 
         eventPublisher.publishEvent(

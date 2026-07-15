@@ -12,4 +12,5 @@ public interface RefreshSessionRepository extends JpaRepository<RefreshSession, 
     Optional<RefreshSession> findByTokenHashAndRevokedAtIsNull(String tokenHash);
     List<RefreshSession> findByUserId(Integer userId);
     List<RefreshSession> findByUserIdAndRevokedAtIsNull(Integer userId);
+    List<RefreshSession> findByUserIdOrderByCreatedAtDesc(Integer userId);
 }

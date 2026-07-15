@@ -3,15 +3,10 @@ package com.studioos.server.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -39,8 +34,21 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // ─── Public endpoints ───
-                        .requestMatchers("/auth/**").permitAll()
+                        // ─── Auth public endpoints ───
+                        .requestMatchers("/auth/register").permitAll()
+                        .requestMatchers("/auth/login").permitAll()
+                        .requestMatchers("/auth/otp/resend").permitAll()
+                        .requestMatchers("/auth/refresh").permitAll()
+                        .requestMatchers("/auth/verification/**").permitAll()
+                        .requestMatchers("/auth/password/login").permitAll()
+                        .requestMatchers("/auth/password/forgot").permitAll()
+                        .requestMatchers("/auth/password/reset").permitAll()
+
+                        // ─── Authenticated session management ───
+                        .requestMatchers("/auth/logout").authenticated()
+                        .requestMatchers("/auth/sessions/**").authenticated()
+                        .requestMatchers("/auth/password/change").authenticated()
+
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/beats/*/download").authenticated()
                         .requestMatchers(HttpMethod.GET, "/beats/**").permitAll()

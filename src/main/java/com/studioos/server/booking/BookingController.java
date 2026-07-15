@@ -15,8 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.studioos.server.booking.dto.BookingResponse;
 import com.studioos.server.booking.dto.ConfirmBookingRequest;
 import com.studioos.server.booking.dto.CreateBookingRequest;
-import com.studioos.server.payment.PaymentService;
-import com.studioos.server.payment.Transaction;
 import com.studioos.server.shared.dto.ApiResponse;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.user.User;
@@ -33,7 +31,6 @@ import lombok.RequiredArgsConstructor;
 public class BookingController {
 
     private final BookingServiceImpl bookingService;
-    private final PaymentService paymentService;
 
     // ─── Create booking ───
     @PostMapping
@@ -53,12 +50,7 @@ public class BookingController {
         @PathVariable String bookingId,
         @Valid @RequestBody InitiatePaymentRequest request
     ) {
-        Transaction transaction = paymentService.initiateBookingPayment(
-                currentUser.getId(), bookingId, request.getPhoneNumber());
-        PaymentInitiationResponse response = PaymentInitiationResponse.builder()
-                            .transactionId(transaction.getId())
-                            .status(transaction.getStatus().name())
-                            .build();
+        PaymentInitiationResponse response = bookingService.initiatePayment(currentUser, bookingId, request.getPhoneNumber());
         return ResponseEntity.ok(ApiResponse.success("Payment initiated Check your phone to complete M-Pesa prompt", response));
 
     }

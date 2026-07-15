@@ -2,8 +2,10 @@ package com.studioos.server.auth;
 
 import com.studioos.server.auth.dto.*;
 import com.studioos.server.shared.dto.ApiResponse;
+import com.studioos.server.user.User;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -49,5 +51,19 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request);
         return ResponseEntity.ok(ApiResponse.success("Logged out", null));
+    }
+
+    @GetMapping("/sessions")
+    public ResponseEntity<ApiResponse<java.util.List<SessionResponse>>> sessions(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.success("Active sessions", authService.sessions(user)));
+    }
+
+    @DeleteMapping("/sessions/{sessionId}")
+    public ResponseEntity<ApiResponse<Void>> revokeSession(
+            @AuthenticationPrincipal User user,
+            @PathVariable String sessionId
+    ) {
+        authService.revokeSession(user, sessionId);
+        return ResponseEntity.ok(ApiResponse.success("Session revoked", null));
     }
 }

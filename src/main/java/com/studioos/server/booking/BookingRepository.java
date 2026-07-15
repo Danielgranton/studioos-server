@@ -31,6 +31,8 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     // Find pending bookings (awaiting confirmation)
     List<Booking> findByStudioIdAndStatus(String studioId, BookingStatus status);
 
+    List<Booking> findByStatusAndPaymentStatusAndCreatedAtBefore(BookingStatus status, BookingPaymentStatus paymentStatus, LocalDateTime createdAtBefore);
+
     Optional<Booking> findByIdAndStudioId(String bookingId, String studioId);
 
     Optional<Booking> findByIdAndArtistId(String bookingId, Integer artistId);
