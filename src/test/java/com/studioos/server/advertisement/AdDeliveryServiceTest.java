@@ -15,6 +15,7 @@ import com.studioos.server.advertisement.campaign.AdCampaign;
 import com.studioos.server.advertisement.campaign.AdCampaignRepository;
 import com.studioos.server.advertisement.pricing.AdvertisementPricing;
 import com.studioos.server.advertisement.pricing.AdvertisementPricingRepository;
+import com.studioos.server.advertisement.targeting.TargetingService;
 import com.studioos.server.shared.enums.AdCampaignStatus;
 import com.studioos.server.shared.enums.AdCreativeStatus;
 import com.studioos.server.shared.enums.AdCreativeType;
@@ -43,6 +44,8 @@ class AdDeliveryServiceTest {
     private AdImpressionRepository adImpressionRepository;
     @Mock
     private PresignedUrlService presignedUrlService;
+    @Mock
+    private TargetingService targetingService;
 
     @InjectMocks
     private AdDeliveryService adDeliveryService;
@@ -92,6 +95,7 @@ class AdDeliveryServiceTest {
         when(advertisementRepository.findByCampaignId("campaign-1")).thenReturn(List.of(capped, eligible));
         when(adBudgetRepository.findByCampaignId("campaign-1")).thenReturn(Optional.of(budget));
         when(advertisementPricingRepository.findByAdvertisementId("ad-eligible")).thenReturn(Optional.of(pricing));
+        when(targetingService.matchesUser("campaign-1", 7)).thenReturn(true);
         when(adImpressionRepository.countByAdvertisementIdAndUserIdAndOccurredAtAfter(eq("ad-capped"), eq(7), any()))
                 .thenReturn(3L, 1L);
         when(adImpressionRepository.countByAdvertisementIdAndUserIdAndOccurredAtAfter(eq("ad-eligible"), eq(7), any()))

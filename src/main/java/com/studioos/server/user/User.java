@@ -52,6 +52,20 @@ public class User implements UserDetails {
     @Column(unique = true)
     private String phone;
 
+    private String passwordHash;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean emailVerified = false;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean phoneVerified = false;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean accountVerified = false;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
@@ -103,7 +117,7 @@ public class User implements UserDetails {
     public String getUsername() { return email; }
 
     @Override
-    public String getPassword() { return null; } // no password — OTP auth
+    public String getPassword() { return passwordHash; }
 
     @Override
     public boolean isAccountNonExpired() { return true; }
@@ -115,5 +129,5 @@ public class User implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
 
     @Override
-    public boolean isEnabled() { return true; }
+    public boolean isEnabled() { return accountVerified; }
 }

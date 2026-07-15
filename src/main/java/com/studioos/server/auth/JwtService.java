@@ -91,12 +91,12 @@ public class JwtService {
         return extractClaim(token, claims -> claims.get("tokenVersion", Integer.class));
     }
 
-    public boolean isTokenOfType(String token, String expectedType) {
-        return expectedType.equals(extractTokenType(token));
+    public Date extractExpiration(String token) {
+        return extractClaim(token, Claims::getExpiration);
     }
 
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
+    public boolean isTokenOfType(String token, String expectedType) {
+        return expectedType.equals(extractTokenType(token));
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {

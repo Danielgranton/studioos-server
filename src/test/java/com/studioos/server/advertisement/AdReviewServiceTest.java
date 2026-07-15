@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 
 import java.util.Optional;
 
+import org.springframework.context.ApplicationEventPublisher;
 import com.studioos.server.shared.enums.AdCreativeStatus;
 import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.exceptions.StudioosException;
@@ -25,6 +26,8 @@ class AdReviewServiceTest {
     private AdvertisementRepository advertisementRepository;
     @Mock
     private AdNotificationService adNotificationService;
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks
     private AdReviewService adReviewService;

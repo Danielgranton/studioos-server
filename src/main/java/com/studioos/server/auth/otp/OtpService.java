@@ -4,6 +4,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.studioos.server.shared.exceptions.StudioosException;
 
@@ -22,6 +23,7 @@ public class OtpService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final OtpRepository otpRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public String generateAndSave(String identifier) {
         // Invalidate any existing OTPs for this identifier
@@ -31,7 +33,7 @@ public class OtpService {
 
         Otp otp = Otp.builder()
                 .identifier(identifier)
-                .code(code)
+                .code(passwordEncoder.encode(code))
                 .expiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES))
                 .failedAttempts(0)
                 .lockedUntil(null)
@@ -55,7 +57,7 @@ public class OtpService {
             throw StudioosException.badRequest("OTP has expired. Please request a new one");
         }
 
-        if (!otp.getCode().equals(code)) {
+        if (!passwordEncoder.matches(code, otp.getCode())) {
             int nextAttempts = otp.getFailedAttempts() == null ? 1 : otp.getFailedAttempts() + 1;
             otp.setFailedAttempts(nextAttempts);
             if (nextAttempts >= MAX_FAILED_ATTEMPTS) {

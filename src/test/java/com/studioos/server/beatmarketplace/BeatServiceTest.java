@@ -35,6 +35,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class BeatServiceTest {
@@ -55,6 +56,8 @@ class BeatServiceTest {
     private com.studioos.server.shared.media.MediaProcessingClient mediaProcessingClient;
     @Mock
     private NotificationServiceImpl notificationService;
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks
     private BeatService beatService;

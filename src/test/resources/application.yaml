@@ -1,0 +1,34 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  data:
+    redis:
+      repositories:
+        enabled: false
+  jpa:
+    open-in-view: false
+  flyway:
+    enabled: false
+
+jwt:
+  secret: test-secret-key-with-enough-length-for-jjwt-signing
+  expiration: 86400000
+  refresh-expiration: 604800000
+
+internal:
+  service:
+    api-key: test-internal-api-key
+
+storage:
+  s3:
+    bucket: test-bucket
+
+opensearch:
+  host: localhost
+  port: 9200
+
+search:
+  indexing:
+    init-on-startup: false

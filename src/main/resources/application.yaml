@@ -43,9 +43,9 @@ spring:
     hibernate:
       ddl-auto: validate        # Flyway handles schema, Hibernate just validates
     show-sql: false
+    open-in-view: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         jdbc:
           time_zone: UTC
@@ -74,6 +74,8 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      repositories:
+        enabled: false
 
 # ─── SERVER ───
 server:
@@ -139,6 +141,10 @@ platform:
 opensearch:
   host: ${OPENSEARCH_HOST}
   port: ${OPENSEARCH_PORT}
+
+search:
+  indexing:
+    init-on-startup: true
 
 # ─── ACTUATOR ───
 management:

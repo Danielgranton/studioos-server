@@ -25,6 +25,9 @@ public class RegisterRequest {
     @NotNull(message = "Role is required")
     private Role role;
 
+    // Optional password for users who want password-based login later
+    private String password;
+
     // Optional profile picture URL
     private String profileImage;
 }

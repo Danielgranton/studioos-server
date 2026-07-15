@@ -24,23 +24,11 @@ public class AuthController {
                 .body(ApiResponse.success("OTP sent successfully", response));
     }
 
-    @PostMapping("/register/verify")
-    public ResponseEntity<ApiResponse<AuthResponse>> verifyRegistration(@Valid @RequestBody VerifyOtpRequest request) {
-        AuthResponse response = authService.verifyRegistration(request);
-        return ResponseEntity.ok(ApiResponse.success("Registration complete", response));
-    }
-
     // ─── Login ───
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<OtpSentResponse>> login(@Valid @RequestBody LoginRequest request) {
         OtpSentResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success("OTP sent successfully", response));
-    }
-
-    @PostMapping("/login/verify")
-    public ResponseEntity<ApiResponse<AuthResponse>> verifyLogin(@Valid @RequestBody VerifyOtpRequest request) {
-        AuthResponse response = authService.verifyLogin(request);
-        return ResponseEntity.ok(ApiResponse.success("Login successful", response));
     }
 
     // ─── Resend OTP ───
@@ -55,5 +43,11 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         AuthResponse response = authService.refreshToken(request);
         return ResponseEntity.ok(ApiResponse.success("Token refreshed", response));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody LogoutRequest request) {
+        authService.logout(request);
+        return ResponseEntity.ok(ApiResponse.success("Logged out", null));
     }
 }

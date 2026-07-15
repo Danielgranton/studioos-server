@@ -1,21 +1,21 @@
 package com.studioos.server.auth;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import java.util.Optional;
-
+import com.studioos.server.auth.dto.AuthResponse;
+import com.studioos.server.auth.dto.LoginRequest;
+import com.studioos.server.auth.dto.OtpSentResponse;
 import com.studioos.server.auth.dto.RefreshTokenRequest;
 import com.studioos.server.auth.dto.RegisterRequest;
-import com.studioos.server.auth.otp.OtpService;
-import com.studioos.server.notification.EmailService;
-import com.studioos.server.notification.SmsService;
+import com.studioos.server.auth.dto.VerifyOtpRequest;
+import com.studioos.server.auth.service.LoginService;
+import com.studioos.server.auth.service.RefreshTokenService;
+import com.studioos.server.auth.service.RegistrationService;
+import com.studioos.server.auth.service.SessionService;
+import com.studioos.server.auth.service.VerificationService;
 import com.studioos.server.shared.enums.Role;
-import com.studioos.server.shared.exceptions.StudioosException;
-import com.studioos.server.user.User;
-import com.studioos.server.user.UserRepository;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,96 +27,78 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AuthServiceTest {
 
     @Mock
-    private UserRepository userRepository;
+    private RegistrationService registrationService;
     @Mock
-    private OtpService otpService;
+    private LoginService loginService;
     @Mock
-    private JwtService jwtService;
+    private VerificationService verificationService;
     @Mock
-    private EmailService emailService;
+    private RefreshTokenService refreshTokenService;
     @Mock
-    private SmsService smsService;
+    private SessionService sessionService;
 
     @InjectMocks
     private AuthService authService;
 
     @Test
-    void registerRejectsSuperAdminSelfRegistration() {
+    void registerDelegatesToRegistrationService() {
         RegisterRequest request = new RegisterRequest();
-        request.setName("Admin");
-        request.setEmail("admin@example.com");
+        request.setName("User");
+        request.setEmail("user@example.com");
         request.setPhone("+254700000000");
-        request.setRole(Role.SUPER_ADMIN);
+        request.setRole(Role.USER);
 
-        assertThatThrownBy(() -> authService.register(request))
-                .isInstanceOf(StudioosException.class)
-                .hasMessageContaining("super admin");
+        OtpSentResponse response = OtpSentResponse.builder().message("ok").build();
+        when(registrationService.register(request)).thenReturn(response);
+
+        assertThat(authService.register(request)).isSameAs(response);
+        verify(registrationService).register(request);
     }
 
     @Test
-    void refreshTokenRejectsAccessToken() {
-        RefreshTokenRequest request = new RefreshTokenRequest();
-        request.setRefreshToken("token");
+    void loginDelegatesToLoginService() {
+        LoginRequest request = new LoginRequest();
+        request.setIdentifier("user@example.com");
 
-        when(jwtService.extractEmail("token")).thenReturn("user@example.com");
-        when(jwtService.isTokenOfType("token", JwtService.TOKEN_TYPE_REFRESH)).thenReturn(false);
+        OtpSentResponse response = OtpSentResponse.builder().message("sent").build();
+        when(loginService.login(request)).thenReturn(response);
 
-        assertThatThrownBy(() -> authService.refreshToken(request))
-                .isInstanceOf(StudioosException.class)
-                .hasMessageContaining("Invalid refresh token");
+        assertThat(authService.login(request)).isSameAs(response);
+        verify(loginService).login(request);
     }
 
     @Test
-    void refreshTokenAcceptsRefreshToken() {
-        RefreshTokenRequest request = new RefreshTokenRequest();
-        request.setRefreshToken("token");
-
-        User user = User.builder().id(1).email("user@example.com").name("User").role(Role.USER).refreshTokenVersion(0).build();
-        when(jwtService.extractEmail("token")).thenReturn("user@example.com");
-        when(jwtService.isTokenOfType("token", JwtService.TOKEN_TYPE_REFRESH)).thenReturn(true);
-        when(jwtService.isTokenExpired("token")).thenReturn(false);
-        when(jwtService.extractTokenVersion("token")).thenReturn(0);
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(jwtService.generateAccessToken(any(User.class))).thenReturn("access");
-        when(jwtService.generateRefreshToken(any(User.class))).thenReturn("refresh");
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        authService.refreshToken(request);
-
-        verify(userRepository).save(user);
-    }
-
-    @Test
-    void refreshTokenRejectsRevokedTokenVersion() {
-        RefreshTokenRequest request = new RefreshTokenRequest();
-        request.setRefreshToken("token");
-
-        User user = User.builder().id(1).email("user@example.com").name("User").role(Role.USER).refreshTokenVersion(2).build();
-        when(jwtService.extractEmail("token")).thenReturn("user@example.com");
-        when(jwtService.isTokenOfType("token", JwtService.TOKEN_TYPE_REFRESH)).thenReturn(true);
-        when(jwtService.isTokenExpired("token")).thenReturn(false);
-        when(jwtService.extractTokenVersion("token")).thenReturn(1);
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-
-        assertThatThrownBy(() -> authService.refreshToken(request))
-                .isInstanceOf(StudioosException.class)
-                .hasMessageContaining("revoked");
-    }
-
-    @Test
-    void verifyLoginUsesStoredEmailForOtpVerification() {
-        com.studioos.server.auth.dto.VerifyOtpRequest request = new com.studioos.server.auth.dto.VerifyOtpRequest();
-        request.setIdentifier("+254700000000");
+    void verifyLoginDelegatesToVerificationService() {
+        VerifyOtpRequest request = new VerifyOtpRequest();
+        request.setIdentifier("user@example.com");
         request.setCode("123456");
 
-        User user = User.builder().id(1).email("user@example.com").phone("+254700000000").name("User").role(Role.USER).refreshTokenVersion(0).build();
-        when(userRepository.findByEmailOrPhone("+254700000000", "+254700000000")).thenReturn(Optional.of(user));
-        when(jwtService.generateAccessToken(any(User.class))).thenReturn("access");
-        when(jwtService.generateRefreshToken(any(User.class))).thenReturn("refresh");
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        AuthResponse response = AuthResponse.builder().userId(1).build();
+        when(verificationService.verifyLogin(request)).thenReturn(response);
 
-        authService.verifyLogin(request);
+        assertThat(authService.verifyLogin(request)).isSameAs(response);
+        verify(verificationService).verifyLogin(request);
+    }
 
-        verify(otpService).verify("user@example.com", "123456");
+    @Test
+    void refreshTokenDelegatesToRefreshTokenService() {
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        request.setRefreshToken("token");
+
+        AuthResponse response = AuthResponse.builder().userId(1).build();
+        when(refreshTokenService.refresh(request)).thenReturn(response);
+
+        assertThat(authService.refreshToken(request)).isSameAs(response);
+        verify(refreshTokenService).refresh(request);
+    }
+
+    @Test
+    void logoutDelegatesToSessionService() {
+        com.studioos.server.auth.dto.LogoutRequest request = new com.studioos.server.auth.dto.LogoutRequest();
+        request.setRefreshToken("token");
+
+        authService.logout(request);
+
+        verify(sessionService).logout(request);
     }
 }

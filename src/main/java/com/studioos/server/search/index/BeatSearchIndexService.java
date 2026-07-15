@@ -3,12 +3,14 @@ package com.studioos.server.search.index;
 import jakarta.annotation.PostConstruct;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch.indices.ExistsRequest;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+@ConditionalOnProperty(prefix = "search.indexing", name = "init-on-startup", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class BeatSearchIndexService {
 

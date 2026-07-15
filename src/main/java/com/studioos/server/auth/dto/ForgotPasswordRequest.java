@@ -4,12 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class LoginRequest {
-
-    // email or phone number
+public class ForgotPasswordRequest {
     @NotBlank(message = "Email or phone number is required")
     private String identifier;
-
-    // Optional for future password-based login flows
-    private String password;
 }

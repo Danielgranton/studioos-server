@@ -15,18 +15,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class OtpServiceTest {
 
     @Mock
     private OtpRepository otpRepository;
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @Test
     void locksOtpAfterRepeatedInvalidAttempts() {
         AtomicReference<Otp> stored = new AtomicReference<>(Otp.builder()
                 .identifier("user@example.com")
-                .code("123456")
+                .code("hashed-valid")
                 .expiresAt(LocalDateTime.now().plusMinutes(10))
                 .failedAttempts(0)
                 .lockedUntil(null)
@@ -35,13 +38,14 @@ class OtpServiceTest {
 
         when(otpRepository.findTopByIdentifierAndUsedFalseOrderByCreatedAtDesc("user@example.com"))
                 .thenAnswer(invocation -> Optional.ofNullable(stored.get()));
+        when(passwordEncoder.matches("000000", "hashed-valid")).thenReturn(false);
         when(otpRepository.save(any(Otp.class))).thenAnswer(invocation -> {
             Otp otp = invocation.getArgument(0);
             stored.set(otp);
             return otp;
         });
 
-        OtpService otpService = new OtpService(otpRepository);
+        OtpService otpService = new OtpService(otpRepository, passwordEncoder);
 
         for (int i = 0; i < 5; i++) {
             assertThatThrownBy(() -> otpService.verify("user@example.com", "000000"))
