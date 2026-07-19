@@ -9,4 +9,5 @@ public interface BeatReviewRepository extends JpaRepository<BeatReview, String> 
     List<BeatReview> findByBeatId(String beatId);
     Optional<BeatReview> findByUserIdAndBeatId(Integer userId, String beatId);
     List<BeatReview> findByBeatIdIn(List<String> beatIds);
+    List<BeatReview> findByUserId (Integer userId);
 }
