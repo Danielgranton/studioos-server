@@ -1,7 +1,6 @@
 package com.studioos.server.advertisement.campaign;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
@@ -18,7 +17,6 @@ import com.studioos.server.payment.Transaction;
 import com.studioos.server.shared.enums.AdCampaignStatus;
 import com.studioos.server.shared.enums.AdPaymentStatus;
 import com.studioos.server.shared.enums.AdPlacement;
-import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.enums.TransactionStatus;
 import com.studioos.server.shared.enums.TransactionType;
 import com.studioos.server.shared.events.TransactionResolvedEvent;

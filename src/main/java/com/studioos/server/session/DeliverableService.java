@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +35,7 @@ public class DeliverableService {
     private final SessionTimelineService timelineService;
     private final PresignedUrlService presignedUrlService;
     private final MediaProcessingClient mediaProcessingClient;
-    private final ApplicationEventPublisher applicationEventPublisher;
+    
     @Value("${storage.s3.bucket}")
     private String mediaBucket;
 

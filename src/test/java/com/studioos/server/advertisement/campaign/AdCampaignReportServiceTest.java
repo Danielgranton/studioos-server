@@ -1,7 +1,6 @@
 package com.studioos.server.advertisement.campaign;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -13,7 +12,7 @@ import com.studioos.server.advertisement.campaign.dto.AdCampaignReportResponse;
 import com.studioos.server.shared.enums.AdCampaignStatus;
 import com.studioos.server.shared.enums.AdPaymentStatus;
 import com.studioos.server.shared.enums.AdPlacement;
-import com.studioos.server.shared.enums.Role;
+
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
