@@ -26,4 +26,10 @@ public class ArtistDashboardResponse {
 
     // Reviews given
     private List<ReviewGivenResponse> reviewsGiven;
+
+    private List<CollectionSummaryResponse> collections;
+
+    private List<RecentlyPlayedResponse> recentlyPlayed;
+
+    private List<DownloadHistoryResponse> downloadHistory;
 }

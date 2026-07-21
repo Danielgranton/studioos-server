@@ -9,8 +9,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.studioos.server.beatmarketplace.Beat;
+import com.studioos.server.beatmarketplace.BeatCollection;
+import com.studioos.server.beatmarketplace.BeatCollectionItemRepository;
+import com.studioos.server.beatmarketplace.BeatCollectionRepository;
+import com.studioos.server.beatmarketplace.BeatDownload;
+import com.studioos.server.beatmarketplace.BeatDownloadRepository;
 import com.studioos.server.beatmarketplace.BeatLike;
 import com.studioos.server.beatmarketplace.BeatLikeRepository;
+import com.studioos.server.beatmarketplace.BeatPlayHistory;
+import com.studioos.server.beatmarketplace.BeatPlayHistoryRepository;
 import com.studioos.server.beatmarketplace.BeatPurchase;
 import com.studioos.server.beatmarketplace.BeatPurchaseRepository;
 import com.studioos.server.beatmarketplace.BeatRepository;
@@ -20,8 +27,11 @@ import com.studioos.server.booking.Booking;
 import com.studioos.server.booking.BookingRepository;
 import com.studioos.server.dashboard.dto.ArtistDashboardResponse;
 import com.studioos.server.dashboard.dto.BookingSummaryResponse;
+import com.studioos.server.dashboard.dto.CollectionSummaryResponse;
+import com.studioos.server.dashboard.dto.DownloadHistoryResponse;
 import com.studioos.server.dashboard.dto.LikedBeatResponse;
 import com.studioos.server.dashboard.dto.PurchasedBeatResponse;
+import com.studioos.server.dashboard.dto.RecentlyPlayedResponse;
 import com.studioos.server.dashboard.dto.ReviewGivenResponse;
 import com.studioos.server.shared.enums.BeatPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
@@ -37,6 +47,10 @@ public class ArtistDashboardService {
     private final BeatLikeRepository beatLikeRepository;
     private final BeatReviewRepository beatReviewRepository;
     private final BeatRepository beatRepository;
+    private final BeatCollectionRepository beatCollectionRepository;
+private final BeatCollectionItemRepository beatCollectionItemRepository;
+private final BeatPlayHistoryRepository beatPlayHistoryRepository;
+private final BeatDownloadRepository beatDownloadRepository;
 
     @Transactional(readOnly = true)
     public ArtistDashboardResponse getDashboard(Integer artistId) {
@@ -101,12 +115,66 @@ public class ArtistDashboardService {
                 .map(r -> toReviewGiven(r, reviewedBeatsById.get(r.getBeatId())))
                 .toList();
 
+        
+        // ─── Collections ───
+        List<BeatCollection> collectionEntities = beatCollectionRepository.findByUserId(artistId);
+        List<CollectionSummaryResponse> collections = collectionEntities.stream()
+                .map(c -> CollectionSummaryResponse.builder()
+                        .id(c.getId())
+                        .name(c.getName())
+                        .beatCount(beatCollectionItemRepository.findByIdCollectionId(c.getId()).size())
+                        .createdAt(c.getCreatedAt())
+                        .build())
+                .toList();
+
+        // ─── Recently played ───
+        List<BeatPlayHistory> recentPlays = beatPlayHistoryRepository.findTop10ByUserIdOrderByPlayedAtDesc(artistId);
+        List<String> recentPlayBeatIds = recentPlays.stream().map(BeatPlayHistory::getBeatId).toList();
+        Map<String, Beat> recentPlayBeatsById = fetchBeatsById(recentPlayBeatIds);
+
+        List<RecentlyPlayedResponse> recentlyPlayed = recentPlays.stream()
+                .map(p -> {
+                Beat beat = recentPlayBeatsById.get(p.getBeatId());
+                return RecentlyPlayedResponse.builder()
+                        .beatId(p.getBeatId())
+                        .title(beat != null ? beat.getTitle() : null)
+                        .coverUrl(beat != null ? beat.getCoverUrl() : null)
+                        .playedAt(p.getPlayedAt())
+                        .build();
+                })
+                .toList();
+
+        // ─── Download history ───
+        List<String> purchaseIds = paidPurchases.stream().map(BeatPurchase::getId).toList();
+        List<BeatDownload> downloads = purchaseIds.isEmpty()
+                ? List.of()
+                : beatDownloadRepository.findByPurchaseIdIn(purchaseIds);
+
+        Map<String, String> purchaseIdToBeatId = paidPurchases.stream()
+                .collect(Collectors.toMap(BeatPurchase::getId, BeatPurchase::getBeatId));
+
+        List<DownloadHistoryResponse> downloadHistory = downloads.stream()
+                .map(d -> {
+                String beatId = purchaseIdToBeatId.get(d.getPurchaseId());
+                Beat beat = beatId != null ? beatsById.get(beatId) : null;
+                return DownloadHistoryResponse.builder()
+                        .beatId(beatId)
+                        .title(beat != null ? beat.getTitle() : null)
+                        .downloadedAt(d.getDownloadedAt())
+                        .build();
+                })
+                .toList();
+        
+
         return ArtistDashboardResponse.builder()
                 .totalBookings(totalBookings)
                 .upcomingBookings(upcomingBookings)
                 .pendingBookings(pendingBookings)
                 .pastBookings(pastBookings)
                 .bookingBreakdown(bookingBreakdown)
+                .collections(collections)
+                .recentlyPlayed(recentlyPlayed)
+                .downloadHistory(downloadHistory)
                 .totalPurchases(totalPurchases)
                 .totalSpent(totalSpent)
                 .purchaseBreakdown(purchaseBreakdown)

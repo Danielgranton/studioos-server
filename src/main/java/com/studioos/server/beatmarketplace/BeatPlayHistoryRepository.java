@@ -9,5 +9,6 @@ public interface BeatPlayHistoryRepository extends JpaRepository<BeatPlayHistory
     List<BeatPlayHistory> findByBeatId(String beatId);
     List<BeatPlayHistory> findByBeatIdInAndPlayedAtAfter(List<String> beatIds, LocalDateTime playedAt);
     List<BeatPlayHistory> findByUserId(Integer userId);
+    List<BeatPlayHistory> findTop10ByUserIdOrderByPlayedAtDesc(Integer userId);
     long countByBeatIdIn(List<String> beatIds);
 }
