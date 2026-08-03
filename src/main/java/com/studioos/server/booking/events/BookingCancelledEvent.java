@@ -8,9 +8,9 @@ import lombok.Data;
 @Builder
 @AllArgsConstructor
 public class BookingCancelledEvent {
-    private String bookingId;
-    private String studioId;
-    private Integer artistId;
-    private boolean cancelledByArtist;
-    private boolean cancelledByAdmin;
+  private String bookingId;
+  private String studioId;
+  private Integer artistId;
+  private boolean cancelledByArtist;
+  private boolean cancelledByAdmin;
 }

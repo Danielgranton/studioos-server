@@ -1,10 +1,10 @@
 package com.studioos.server.advertisement;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import jakarta.persistence.*;
-import lombok.*;
 
 @Entity
 @Table(name = "ad_clicks")
@@ -15,19 +15,19 @@ import lombok.*;
 @AllArgsConstructor
 public class AdClick {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private String id;
 
-    @Column(nullable = false)
-    private String advertisementId;
+  @Column(nullable = false)
+  private String advertisementId;
 
-    @Column(nullable = false)
-    private String campaignId;
+  @Column(nullable = false)
+  private String campaignId;
 
-    private Integer userId;
+  private Integer userId;
 
-    @CreatedDate
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime clickedAt;
+  @CreatedDate
+  @Column(nullable = false, updatable = false)
+  private LocalDateTime clickedAt;
 }
