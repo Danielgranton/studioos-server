@@ -22,37 +22,45 @@ public class NotificationServiceImpl {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final NotificationPreferenceService notificationPreferenceService;
     private final EmailService emailService;
     private final SmsService smsService;
 
-    // ─── Create notification (saves to DB + sends email + SMS) ───
+    // ─── Create notification (respects per-type channel preferences) ───
     @Transactional
     public NotificationResponse createNotification(CreateNotificationRequest request) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> StudioosException.notFound("User not found"));
 
-        // ─── Save to database ───
-        Notification notification = Notification.builder()
-                .userId(request.getUserId())
-                .type(request.getType())
-                .title(request.getTitle())
-                .message(request.getMessage())
-                .relatedEntityId(request.getRelatedEntityId())
-                .isRead(false)
-                .build();
+        NotificationPreference preference = notificationPreferenceService
+                .resolvePreference(user, request.getType());
 
-        notificationRepository.save(notification);
-        log.info("Notification saved to DB: {} for user: {}", notification.getId(), user.getEmail());
+        Notification notification = null;
+        if (preference.isInAppEnabled()) {
+            notification = Notification.builder()
+                    .userId(request.getUserId())
+                    .type(request.getType())
+                    .title(request.getTitle())
+                    .message(request.getMessage())
+                    .relatedEntityId(request.getRelatedEntityId())
+                    .isRead(false)
+                    .build();
 
-        // ─── Send email ───
-        emailService.sendNotification(user.getEmail(), request.getTitle(), request.getMessage());
+            notificationRepository.save(notification);
+            log.info("Notification saved to DB: {} for user: {}", notification.getId(), user.getEmail());
+        } else {
+            log.info("In-app notification suppressed for user {} type {}", user.getEmail(), request.getType());
+        }
 
-        // ─── Send SMS ───
-        if (user.getPhone() != null && !user.getPhone().isEmpty()) {
+        if (preference.isEmailEnabled()) {
+            emailService.sendNotification(user.getEmail(), request.getTitle(), request.getMessage());
+        }
+
+        if (preference.isSmsEnabled() && user.getPhone() != null && !user.getPhone().isEmpty()) {
             smsService.sendNotification(user.getPhone(), request.getMessage());
         }
 
-        return toResponse(notification);
+        return notification == null ? null : toResponse(notification);
     }
 
     // ─── Get user's notifications (paginated) ───

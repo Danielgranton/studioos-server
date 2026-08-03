@@ -2,6 +2,8 @@ package com.studioos.server.notification;
 
 import com.studioos.server.shared.dto.ApiResponse;
 import com.studioos.server.shared.dto.PageResponse;
+import com.studioos.server.notification.dto.BulkUpdateNotificationPreferencesRequest;
+import com.studioos.server.notification.dto.NotificationPreferenceResponse;
 import com.studioos.server.notification.dto.NotificationResponse;
 import com.studioos.server.user.User;
 import lombok.RequiredArgsConstructor;
@@ -9,12 +11,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/notifications")
 @RequiredArgsConstructor
 public class NotificationController {
 
     private final NotificationServiceImpl notificationService;
+    private final NotificationPreferenceService notificationPreferenceService;
 
     // ─── Get all my notifications (paginated, newest first) ───
     @GetMapping
@@ -74,5 +79,29 @@ public class NotificationController {
     ) {
         notificationService.deleteNotification(currentUser, notificationId);
         return ResponseEntity.ok(ApiResponse.success("Notification deleted"));
+    }
+
+    @GetMapping("/preferences")
+    public ResponseEntity<ApiResponse<java.util.List<NotificationPreferenceResponse>>> getPreferences(
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(notificationPreferenceService.getPreferences(currentUser)));
+    }
+
+    @PutMapping("/preferences")
+    public ResponseEntity<ApiResponse<java.util.List<NotificationPreferenceResponse>>> updatePreferences(
+            @AuthenticationPrincipal User currentUser,
+            @Valid @RequestBody BulkUpdateNotificationPreferencesRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                notificationPreferenceService.updatePreferences(currentUser, request.getPreferences())));
+    }
+
+    @PostMapping("/preferences/reset")
+    public ResponseEntity<ApiResponse<java.util.List<NotificationPreferenceResponse>>> resetPreferences(
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                notificationPreferenceService.resetToRoleDefaults(currentUser)));
     }
 }
