@@ -34,4 +34,8 @@ public class StudioosException extends RuntimeException {
     public static StudioosException conflict(String message) {
         return new StudioosException(message, HttpStatus.CONFLICT);
     }
+
+    public static StudioosException tooManyRequests(String message) {
+        return new StudioosException(message, HttpStatus.TOO_MANY_REQUESTS);
+    }
 }

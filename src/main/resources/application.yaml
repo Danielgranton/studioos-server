@@ -97,6 +97,9 @@ jwt:
   expiration: ${JWT_EXPIRATION:86400000}        # 24 hours in ms
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}  # 7 days in ms
 
+auth:
+  cookies-secure: ${AUTH_COOKIES_SECURE:false}
+
 internal:
   service:
     api-key: ${INTERNAL_SERVICE_API_KEY:}

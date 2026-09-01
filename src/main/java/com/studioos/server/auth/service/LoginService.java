@@ -8,6 +8,7 @@ import com.studioos.server.communication.CommunicationRequestFactory;
 import com.studioos.server.auth.dto.LoginRequest;
 import com.studioos.server.auth.dto.OtpSentResponse;
 import com.studioos.server.auth.otp.OtpService;
+import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.user.User;
 
 import lombok.RequiredArgsConstructor;
@@ -25,30 +26,32 @@ public class LoginService {
 
     @Transactional
     public OtpSentResponse login(LoginRequest request) {
-        User user = userLookupService.findByIdentifier(request.getIdentifier());
+        User user;
+        try {
+            user = userLookupService.findByIdentifier(request.getIdentifier());
+        } catch (StudioosException exception) {
+            if (exception.getStatus().is4xxClientError()) {
+                return genericResponse();
+            }
+            throw exception;
+        }
+
         String otp = otpService.generateAndSave(user.getEmail());
         communicationClient.send(communicationRequestFactory.otp(user.getEmail(), user.getPhone(), otp));
         log.info("Login OTP queued for user: {}", user.getEmail());
 
-        return OtpSentResponse.builder()
-                .message("Verification code sent to your email and phone")
-                .maskedEmail(maskEmail(user.getEmail()))
-                .maskedPhone(maskPhone(user.getPhone()))
-                .build();
+        // Keep the response shape identical for existing and unknown identifiers.
+        return genericResponse();
     }
 
     public OtpSentResponse resendOtp(LoginRequest request) {
         return login(request);
     }
 
-    private String maskEmail(String email) {
-        if (email == null) return null;
-        String[] parts = email.split("@");
-        return parts[0].substring(0, Math.min(3, parts[0].length())) + "***@" + parts[1];
+    private OtpSentResponse genericResponse() {
+        return OtpSentResponse.builder()
+                .message("If an account exists, a verification code has been sent")
+                .build();
     }
 
-    private String maskPhone(String phone) {
-        if (phone == null) return null;
-        return phone.substring(0, Math.min(4, phone.length())) + "****";
-    }
 }

@@ -15,6 +15,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Cookie;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -33,7 +34,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        final String authHeader = request.getHeader("Authorization");
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null && request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("studioos_access".equals(cookie.getName())) {
+                    authHeader = "Bearer " + cookie.getValue();
+                    break;
+                }
+            }
+        }
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);

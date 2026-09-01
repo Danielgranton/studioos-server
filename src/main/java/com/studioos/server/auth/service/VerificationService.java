@@ -23,27 +23,32 @@ public class VerificationService {
 
     @Transactional
     public AuthResponse verify(VerifyOtpRequest request) {
-        User user = userLookupService.findByIdentifier(request.getIdentifier());
-        otpService.verify(user.getEmail(), request.getCode());
-
-        user.setEmailVerified(true);
-        user.setPhoneVerified(true);
-        user.setAccountVerified(true);
-        userRepository.save(user);
-        sessionService.logoutAllDevices(user);
-
-        AuthResponse response = tokenService.issue(user);
-        sessionService.recordSession(user, response.getRefreshToken());
-        return response;
+        return verifyRegistration(request);
     }
 
     @Transactional
     public AuthResponse verifyLogin(VerifyOtpRequest request) {
-        return verify(request);
+        User user = userLookupService.findByIdentifier(request.getIdentifier());
+        otpService.verify(user.getEmail(), request.getCode());
+        return issueSession(user);
     }
 
     @Transactional
     public AuthResponse verifyRegistration(VerifyOtpRequest request) {
-        return verify(request);
+        User user = userLookupService.findByIdentifier(request.getIdentifier());
+        otpService.verify(user.getEmail(), request.getCode());
+
+        // Registration OTPs are email-keyed; do not claim phone verification too.
+        user.setEmailVerified(true);
+        user.setAccountVerified(true);
+        userRepository.save(user);
+        return issueSession(user);
+    }
+
+    private AuthResponse issueSession(User user) {
+        sessionService.logoutAllDevices(user);
+        AuthResponse response = tokenService.issue(user);
+        sessionService.recordSession(user, response.getRefreshToken());
+        return response;
     }
 }
