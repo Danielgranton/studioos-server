@@ -14,15 +14,20 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class BeatSearchIndexService {
 
-    private static final String BEAT_INDEX = "beats";
-    private static final String STUDIO_INDEX = "studios";
+    private static final String[] SEARCH_INDEXES = {
+            "beats",
+            "studios",
+            "producers",
+            "advertisements"
+    };
 
     private final OpenSearchClient openSearchClient;
 
     @PostConstruct
     public void ensureIndicesExist() {
-        ensureIndexExists(BEAT_INDEX);
-        ensureIndexExists(STUDIO_INDEX);
+        for (String indexName : SEARCH_INDEXES) {
+            ensureIndexExists(indexName);
+        }
     }
 
     private void ensureIndexExists(String indexName) {

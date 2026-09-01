@@ -4,6 +4,8 @@ import com.studioos.server.search.analytics.SearchAnalyticsService;
 import com.studioos.server.search.document.StudioDocument;
 import com.studioos.server.search.dto.StudioSearchRequest;
 import com.studioos.server.search.dto.StudioSearchResult;
+import com.studioos.server.search.dto.SearchPageResponse;
+import com.studioos.server.search.exception.SearchException;
 import com.studioos.server.shared.enums.SearchEntityType;
 import com.studioos.server.user.User;
 
@@ -30,7 +32,7 @@ public class OpenSearchStudioSearchService {
     private final OpenSearchQueryClient openSearchClient;
     private final SearchAnalyticsService searchAnalyticsService;
 
-    public List<StudioSearchResult> searchStudios(StudioSearchRequest request) {
+    public SearchPageResponse<StudioSearchResult> searchStudios(StudioSearchRequest request) {
 
         try {
             BoolQuery.Builder boolQuery = new BoolQuery.Builder();
@@ -57,10 +59,15 @@ public class OpenSearchStudioSearchService {
 
             searchAnalyticsService.recordSearch(SearchEntityType.STUDIO, request.getQuery(), currentUserId(), results.size());
 
-            return results;
+            return SearchPageResponse.<StudioSearchResult>builder()
+                    .results(results)
+                    .page(request.getPage())
+                    .size(request.getSize())
+                    .total(response.hits().total() == null ? results.size() : response.hits().total().value())
+                    .build();
         } catch (Exception e) {
             log.error("OpenSearch studio query failed: {}", e.getMessage());
-            return List.of();
+            throw new SearchException("Studio search is temporarily unavailable", e);
         }
     }
 

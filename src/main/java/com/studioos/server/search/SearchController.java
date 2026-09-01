@@ -6,9 +6,9 @@ import com.studioos.server.search.dto.BeatSearchRequest;
 import com.studioos.server.search.dto.BeatSearchResult;
 import com.studioos.server.search.dto.ProducerSearchResult;
 import com.studioos.server.search.dto.RecentSearchResponse;
-import com.studioos.server.search.dto.SearchReindexResponse;
 import com.studioos.server.search.dto.SearchRequest;
 import com.studioos.server.search.dto.SearchResponseDto;
+import com.studioos.server.search.dto.SearchPageResponse;
 import com.studioos.server.search.dto.TrendingResponse;
 import com.studioos.server.search.dto.StudioSearchRequest;
 import com.studioos.server.search.dto.StudioSearchResult;
@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -35,12 +34,12 @@ public class SearchController {
     private final SearchFacadeService searchFacadeService;
 
     @GetMapping("/beats")
-    public List<BeatSearchResult> searchBeats(@ModelAttribute BeatSearchRequest request) {
+    public SearchPageResponse<BeatSearchResult> searchBeats(@ModelAttribute BeatSearchRequest request) {
         return searchFacadeService.searchBeats(request);
     }
 
     @GetMapping("/studios")
-    public List<StudioSearchResult> searchStudios(@ModelAttribute StudioSearchRequest request) {
+    public SearchPageResponse<StudioSearchResult> searchStudios(@ModelAttribute StudioSearchRequest request) {
         return searchFacadeService.searchStudios(request);
     }
 
@@ -55,7 +54,7 @@ public class SearchController {
     }
 
     @GetMapping("/advertisements")
-    public List<AdvertisementSearchResult> searchAdvertisements(
+    public SearchPageResponse<AdvertisementSearchResult> searchAdvertisements(
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -63,7 +62,7 @@ public class SearchController {
     }
 
     @GetMapping("/producers")
-    public List<ProducerSearchResult> searchProducers(
+    public SearchPageResponse<ProducerSearchResult> searchProducers(
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -87,8 +86,4 @@ public class SearchController {
         searchFacadeService.clearRecent(user);
     }
 
-    @PostMapping("/reindex")
-    public SearchReindexResponse reindex() {
-        return searchFacadeService.reindexAll();
-    }
 }

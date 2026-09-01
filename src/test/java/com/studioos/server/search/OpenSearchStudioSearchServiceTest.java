@@ -11,6 +11,7 @@ import com.studioos.server.search.analytics.SearchAnalyticsService;
 import com.studioos.server.search.document.StudioDocument;
 import com.studioos.server.search.dto.StudioSearchRequest;
 import com.studioos.server.search.dto.StudioSearchResult;
+import com.studioos.server.search.dto.SearchPageResponse;
 import com.studioos.server.shared.enums.SearchEntityType;
 import com.studioos.server.user.User;
 import java.util.List;
@@ -71,10 +72,11 @@ class OpenSearchStudioSearchServiceTest {
         StudioSearchRequest request = new StudioSearchRequest();
         request.setQuery("studio");
 
-        List<StudioSearchResult> results = searchService.searchStudios(request);
+        SearchPageResponse<StudioSearchResult> responsePage = searchService.searchStudios(request);
 
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).getId()).isEqualTo("studio-1");
+        assertThat(responsePage.getResults()).hasSize(1);
+        assertThat(responsePage.getResults().get(0).getId()).isEqualTo("studio-1");
+        assertThat(responsePage.getTotal()).isEqualTo(1);
         verify(searchAnalyticsService).recordSearch(SearchEntityType.STUDIO, "studio", 77, 1);
     }
 }

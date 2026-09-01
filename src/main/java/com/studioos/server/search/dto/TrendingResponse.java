@@ -12,6 +12,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TrendingResponse {
     private SearchEntityType entityType;
-    private String query;
-    private Long count;
+    private String title;
+    private Long score;
 }

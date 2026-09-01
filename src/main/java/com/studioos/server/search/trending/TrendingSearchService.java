@@ -25,8 +25,8 @@ public class TrendingSearchService {
         return searchEventRepository.findTopSearches(entityType, LocalDateTime.now().minusDays(7)).stream()
                 .map(item -> TrendingResponse.builder()
                         .entityType(entityType)
-                        .query(item.getQuery())
-                        .count(item.getSearchCount())
+                        .title(item.getQuery())
+                        .score(item.getSearchCount())
                         .build())
                 .toList();
     }

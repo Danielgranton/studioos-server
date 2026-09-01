@@ -66,7 +66,11 @@ public class SearchCacheService {
             String[] parts = item.split("\\|", 2);
             SearchEntityType type = parts.length > 0 ? SearchEntityType.valueOf(parts[0]) : SearchEntityType.GLOBAL;
             String query = parts.length > 1 ? parts[1] : "";
-            result.add(RecentSearchResponse.builder().entityType(type).query(query).build());
+            result.add(RecentSearchResponse.builder()
+                    .id(type + "|" + query)
+                    .entityType(type)
+                    .query(query)
+                    .build());
         }
         return result;
     }
@@ -94,8 +98,8 @@ public class SearchCacheService {
             Double score = redisTemplate.opsForZSet().score(TRENDING_PREFIX + entityType.name(), query);
             result.add(TrendingResponse.builder()
                     .entityType(entityType)
-                    .query(query)
-                    .count(score == null ? 0L : score.longValue())
+                    .title(query)
+                    .score(score == null ? 0L : score.longValue())
                     .build());
         }
         return result;

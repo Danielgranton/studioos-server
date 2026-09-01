@@ -1,6 +1,6 @@
 package com.studioos.server.search.dto;
 
-import com.studioos.server.shared.enums.SearchEntityType;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,8 +10,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RecentSearchResponse {
-    private String id;
-    private SearchEntityType entityType;
-    private String query;
+public class SearchPageResponse<T> {
+    private List<T> results;
+    private int page;
+    private int size;
+    private long total;
 }

@@ -15,6 +15,7 @@ import com.studioos.server.search.analytics.SearchAnalyticsService;
 import com.studioos.server.search.document.BeatDocument;
 import com.studioos.server.search.dto.BeatSearchRequest;
 import com.studioos.server.search.dto.BeatSearchResult;
+import com.studioos.server.search.dto.SearchPageResponse;
 import com.studioos.server.search.ranking.BeatRankingEngine;
 import com.studioos.server.shared.enums.SearchEntityType;
 import com.studioos.server.user.User;
@@ -89,10 +90,11 @@ class OpenSearchBeatSearchServiceTest {
         BeatSearchRequest request = new BeatSearchRequest();
         request.setQuery("night");
 
-        List<BeatSearchResult> results = searchService.searchBeats(request);
+        SearchPageResponse<BeatSearchResult> responsePage = searchService.searchBeats(request);
 
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).getId()).isEqualTo("beat-1");
+        assertThat(responsePage.getResults()).hasSize(1);
+        assertThat(responsePage.getResults().get(0).getId()).isEqualTo("beat-1");
+        assertThat(responsePage.getTotal()).isEqualTo(1);
         verify(searchAnalyticsService).recordSearch(SearchEntityType.BEAT, "night", 42, 1);
     }
 }

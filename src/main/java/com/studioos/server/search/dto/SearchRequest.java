@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 public class SearchRequest {
-    private String query;
+    private String q;
     private SearchEntityType entityType;
     private String location;
     private String genre;
@@ -13,4 +13,12 @@ public class SearchRequest {
     private Integer maxPrice;
     private Integer page = 0;
     private Integer size = 20;
+
+    public String getQuery() {
+        return q;
+    }
+
+    public void setQuery(String query) {
+        this.q = query;
+    }
 }

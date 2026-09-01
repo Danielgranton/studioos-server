@@ -1,48 +1,54 @@
 package com.studioos.server.search.service;
 
-import com.studioos.server.advertisement.AdvertisementRepository;
-import com.studioos.server.advertisement.campaign.AdCampaignRepository;
+import com.studioos.server.search.OpenSearchQueryClient;
+import com.studioos.server.search.document.AdvertisementDocument;
 import com.studioos.server.search.dto.AdvertisementSearchResult;
+import com.studioos.server.search.dto.SearchPageResponse;
 import com.studioos.server.search.mapper.AdvertisementMapper;
-import com.studioos.server.search.util.SearchSanitizer;
-import com.studioos.server.shared.enums.AdCreativeStatus;
-import java.util.Comparator;
+import com.studioos.server.search.exception.SearchException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.opensearch.client.opensearch._types.FieldValue;
+import org.opensearch.client.opensearch._types.query_dsl.BoolQuery;
+import org.opensearch.client.opensearch._types.query_dsl.Query;
+import org.opensearch.client.opensearch.core.SearchResponse;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class AdvertisementSearchService {
 
-    private final AdvertisementRepository advertisementRepository;
-    private final AdCampaignRepository adCampaignRepository;
+    private final OpenSearchQueryClient openSearchClient;
 
-    public List<AdvertisementSearchResult> search(String query, int page, int size) {
-        String needle = SearchSanitizer.sanitize(query);
-        return advertisementRepository.findAll().stream()
-                .filter(ad -> matches(ad.getHeadline(), needle)
-                        || matches(ad.getDescription(), needle)
-                        || matches(adCampaignRepository.findById(ad.getCampaignId()).map(c -> c.getTitle()).orElse(null), needle))
-                .map(ad -> AdvertisementMapper.toDocument(ad, adCampaignRepository.findById(ad.getCampaignId()).orElse(null)))
-                .map(doc -> AdvertisementMapper.toResult(doc, score(doc, needle)))
-                .filter(result -> result.getStatus() == AdCreativeStatus.READY
-                        || result.getStatus() == AdCreativeStatus.RUNNING
-                        || result.getStatus() == AdCreativeStatus.PENDING_REVIEW)
-                .sorted(Comparator.comparingDouble(AdvertisementSearchResult::getScore).reversed())
-                .skip((long) page * size)
-                .limit(size)
+    private static final List<FieldValue> VISIBLE_STATUSES = List.of(
+            FieldValue.of(v -> v.stringValue("READY")),
+            FieldValue.of(v -> v.stringValue("RUNNING")),
+            FieldValue.of(v -> v.stringValue("PENDING_REVIEW")));
+
+    public SearchPageResponse<AdvertisementSearchResult> search(String query, int page, int size) {
+        String needle = query == null ? "" : query.trim();
+        try {
+            BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+            boolQuery.filter(f -> f.terms(t -> t.field("status").terms(v -> v.value(VISIBLE_STATUSES))));
+            if (!needle.isBlank()) {
+            boolQuery.should(s -> s.match(m -> m.field("headline").query(q -> q.stringValue(needle))))
+                    .should(s -> s.match(m -> m.field("description").query(q -> q.stringValue(needle))))
+                    .should(s -> s.match(m -> m.field("campaignTitle").query(q -> q.stringValue(needle))))
+                    .minimumShouldMatch("1");
+            }
+            Query finalQuery = Query.of(q -> q.bool(boolQuery.build()));
+            SearchResponse<AdvertisementDocument> response = openSearchClient.search(s -> s
+                        .index("advertisements").query(finalQuery).from(page * size).size(size),
+                AdvertisementDocument.class);
+            List<AdvertisementSearchResult> results = response.hits().hits().stream()
+                .filter(hit -> hit.source() != null)
+                .map(hit -> AdvertisementMapper.toResult(hit.source(), hit.score()))
                 .toList();
-    }
-
-    private boolean matches(String value, String needle) {
-        return needle.isBlank() || (value != null && value.toLowerCase().contains(needle));
-    }
-
-    private double score(com.studioos.server.search.document.AdvertisementDocument doc, String needle) {
-        double titleBoost = matches(doc.getHeadline(), needle) ? 1.0 : 0.0;
-        double campaignBoost = matches(doc.getCampaignTitle(), needle) ? 0.6 : 0.0;
-        double descBoost = matches(doc.getDescription(), needle) ? 0.3 : 0.0;
-        return titleBoost + campaignBoost + descBoost;
+            long total = response.hits().total() == null ? results.size() : response.hits().total().value();
+            return SearchPageResponse.<AdvertisementSearchResult>builder()
+                    .results(results).page(page).size(size).total(total).build();
+        } catch (Exception e) {
+            throw new SearchException("Advertisement search is temporarily unavailable", e);
+        }
     }
 }

@@ -5,6 +5,8 @@ import com.studioos.server.search.document.BeatDocument;
 import com.studioos.server.search.dto.AutocompleteSuggestion;
 import com.studioos.server.search.dto.BeatSearchRequest;
 import com.studioos.server.search.dto.BeatSearchResult;
+import com.studioos.server.search.dto.SearchPageResponse;
+import com.studioos.server.search.exception.SearchException;
 import com.studioos.server.search.ranking.BeatRankingEngine;
 import com.studioos.server.shared.enums.SearchEntityType;
 import com.studioos.server.user.User;
@@ -41,23 +43,25 @@ public class OpenSearchBeatSearchService implements SearchService {
     private final SearchAnalyticsService searchAnalyticsService;
 
     @Override
-    public List<BeatSearchResult> searchBeats(BeatSearchRequest request) {
+    public SearchPageResponse<BeatSearchResult> searchBeats(BeatSearchRequest request) {
 
         String cacheKey = buildCacheKey(request);
 
         String cached = redisTemplate.opsForValue().get(cacheKey);
         if (cached != null) {
             try {
-                return List.of(objectMapper.readValue(cached, BeatSearchResult[].class));
+                return objectMapper.readValue(cached,
+                        objectMapper.getTypeFactory().constructParametricType(
+                                SearchPageResponse.class, BeatSearchResult.class));
             } catch (Exception e) {
                 log.warn("Failed to deserialize cached search result for key {}: {}", cacheKey, e.getMessage());
                 // fall through to live search rather than fail the request over a cache issue
             }
         }
 
-        List<BeatSearchResult> results = executeSearch(request);
+        SearchPageResponse<BeatSearchResult> results = executeSearch(request);
 
-        searchAnalyticsService.recordSearch(SearchEntityType.BEAT, request.getQuery(), currentUserId(), results.size());
+        searchAnalyticsService.recordSearch(SearchEntityType.BEAT, request.getQuery(), currentUserId(), results.getResults().size());
 
         try {
             redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(results), CACHE_TTL);
@@ -68,7 +72,7 @@ public class OpenSearchBeatSearchService implements SearchService {
         return results;
     }
 
-   private List<BeatSearchResult> executeSearch(BeatSearchRequest request) {
+    private SearchPageResponse<BeatSearchResult> executeSearch(BeatSearchRequest request) {
     try {
         BoolQuery.Builder boolQuery = new BoolQuery.Builder();
 
@@ -107,7 +111,7 @@ public class OpenSearchBeatSearchService implements SearchService {
                 .mapToInt(h -> h.source() != null && h.source().getPlayCount() != null ? h.source().getPlayCount() : 0)
                 .max().orElse(1);
 
-        return hits.stream()
+        List<BeatSearchResult> results = hits.stream()
                 .map(hit -> {
                     BeatSearchResult result = toResult(hit.source(), hit.score());
                     result.setRankScore(beatRankingEngine.score(hit, maxTextScore, maxPlayCount));
@@ -116,9 +120,16 @@ public class OpenSearchBeatSearchService implements SearchService {
                 .sorted(Comparator.comparingDouble(BeatSearchResult::getRankScore).reversed())
                 .collect(Collectors.toList());
 
+        return SearchPageResponse.<BeatSearchResult>builder()
+                .results(results)
+                .page(request.getPage())
+                .size(request.getSize())
+                .total(response.hits().total() == null ? results.size() : response.hits().total().value())
+                .build();
+
     } catch (Exception e) {
         log.error("OpenSearch query failed: {}", e.getMessage());
-        return List.of();
+        throw new SearchException("Beat search is temporarily unavailable", e);
     }
     }
 
@@ -134,11 +145,14 @@ public class OpenSearchBeatSearchService implements SearchService {
 
         return response.hits().hits().stream()
                 .filter(h -> h.source() != null)
-                .map(h -> new AutocompleteSuggestion(h.source().getId(), h.source().getTitle()))
+                .map(h -> new AutocompleteSuggestion(
+                        h.source().getId(),
+                        h.source().getTitle(),
+                        SearchEntityType.BEAT))
                 .collect(Collectors.toList());
     } catch (Exception e) {
         log.error("Autocomplete query failed: {}", e.getMessage());
-        return List.of();
+        throw new SearchException("Search suggestions are temporarily unavailable", e);
     }
     }
 

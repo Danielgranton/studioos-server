@@ -9,6 +9,7 @@ import com.studioos.server.search.dto.RecentSearchResponse;
 import com.studioos.server.search.dto.SearchReindexResponse;
 import com.studioos.server.search.dto.SearchRequest;
 import com.studioos.server.search.dto.SearchResponseDto;
+import com.studioos.server.search.dto.SearchPageResponse;
 import com.studioos.server.search.dto.TrendingResponse;
 import com.studioos.server.search.dto.StudioSearchRequest;
 import com.studioos.server.search.dto.StudioSearchResult;
@@ -37,11 +38,11 @@ public class SearchFacadeService {
     private final SearchCacheService searchCacheService;
     private final SearchIndexService searchIndexService;
 
-    public List<BeatSearchResult> searchBeats(BeatSearchRequest request) {
+    public SearchPageResponse<BeatSearchResult> searchBeats(BeatSearchRequest request) {
         return beatSearchService.searchBeats(request);
     }
 
-    public List<StudioSearchResult> searchStudios(StudioSearchRequest request) {
+    public SearchPageResponse<StudioSearchResult> searchStudios(StudioSearchRequest request) {
         return studioSearchService.searchStudios(request);
     }
 
@@ -53,11 +54,11 @@ public class SearchFacadeService {
         return globalSearchService.search(request);
     }
 
-    public List<ProducerSearchResult> searchProducers(String query, int page, int size) {
+    public SearchPageResponse<ProducerSearchResult> searchProducers(String query, int page, int size) {
         return producerSearchService.search(query, page, size);
     }
 
-    public List<AdvertisementSearchResult> searchAdvertisements(String query, int page, int size) {
+    public SearchPageResponse<AdvertisementSearchResult> searchAdvertisements(String query, int page, int size) {
         return advertisementSearchService.search(query, page, size);
     }
 

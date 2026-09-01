@@ -1,13 +1,16 @@
 package com.studioos.server.search.service;
 
-import com.studioos.server.reviews.ProducerReviewRepository;
+import com.studioos.server.search.OpenSearchQueryClient;
+import com.studioos.server.search.document.ProducerDocument;
 import com.studioos.server.search.dto.ProducerSearchResult;
+import com.studioos.server.search.dto.SearchPageResponse;
 import com.studioos.server.search.mapper.ProducerMapper;
+import com.studioos.server.search.exception.SearchException;
 import com.studioos.server.search.util.SearchSanitizer;
-import com.studioos.server.shared.enums.Role;
-import com.studioos.server.user.UserRepository;
-import java.util.Comparator;
 import java.util.List;
+import org.opensearch.client.opensearch._types.query_dsl.BoolQuery;
+import org.opensearch.client.opensearch._types.query_dsl.Query;
+import org.opensearch.client.opensearch.core.SearchResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,36 +18,32 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ProducerSearchService {
 
-    private final UserRepository userRepository;
-    private final ProducerReviewRepository producerReviewRepository;
+    private final OpenSearchQueryClient openSearchClient;
 
-    public List<ProducerSearchResult> search(String query, int page, int size) {
+    public SearchPageResponse<ProducerSearchResult> search(String query, int page, int size) {
         String needle = SearchSanitizer.sanitize(query);
-        return userRepository.findByRole(Role.PRODUCER).stream()
-                .filter(user -> matches(user.getName(), needle)
-                        || matches(user.getGenre(), needle)
-                        || matches(user.getLocation(), needle)
-                        || matches(user.getBio(), needle))
-                .map(user -> ProducerMapper.toDocument(
-                        user,
-                        producerReviewRepository.findAverageRatingByProducerId(user.getId()),
-                        (int) producerReviewRepository.countByProducerId(user.getId())))
-                .map(doc -> ProducerMapper.toResult(doc, score(doc, needle)))
-                .sorted(Comparator.comparingDouble(ProducerSearchResult::getScore).reversed())
-                .skip((long) page * size)
-                .limit(size)
+        try {
+            BoolQuery.Builder boolQuery = new BoolQuery.Builder();
+            if (!needle.isBlank()) {
+            boolQuery.should(s -> s.match(m -> m.field("name").query(q -> q.stringValue(needle))))
+                    .should(s -> s.match(m -> m.field("genre").query(q -> q.stringValue(needle))))
+                    .should(s -> s.match(m -> m.field("location").query(q -> q.stringValue(needle))))
+                    .should(s -> s.match(m -> m.field("bio").query(q -> q.stringValue(needle))))
+                    .minimumShouldMatch("1");
+            }
+            Query finalQuery = Query.of(q -> q.bool(boolQuery.build()));
+            SearchResponse<ProducerDocument> response = openSearchClient.search(s -> s
+                        .index("producers").query(finalQuery).from(page * size).size(size),
+                ProducerDocument.class);
+            List<ProducerSearchResult> results = response.hits().hits().stream()
+                .filter(hit -> hit.source() != null)
+                .map(hit -> ProducerMapper.toResult(hit.source(), hit.score()))
                 .toList();
-    }
-
-    private boolean matches(String value, String needle) {
-        return needle.isBlank() || (value != null && value.toLowerCase().contains(needle));
-    }
-
-    private double score(com.studioos.server.search.document.ProducerDocument doc, String needle) {
-        double nameBoost = matches(doc.getName(), needle) ? 1.0 : 0.0;
-        double genreBoost = matches(doc.getGenre(), needle) ? 0.6 : 0.0;
-        double bioBoost = matches(doc.getBio(), needle) ? 0.3 : 0.0;
-        double ratingBoost = doc.getAverageRating() != null ? doc.getAverageRating() / 5.0 : 0.0;
-        return nameBoost + genreBoost + bioBoost + ratingBoost;
+            long total = response.hits().total() == null ? results.size() : response.hits().total().value();
+            return SearchPageResponse.<ProducerSearchResult>builder()
+                    .results(results).page(page).size(size).total(total).build();
+        } catch (Exception e) {
+            throw new SearchException("Producer search is temporarily unavailable", e);
+        }
     }
 }

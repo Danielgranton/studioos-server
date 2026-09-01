@@ -38,6 +38,7 @@ public class GlobalSearchService {
         }
 
         List<SearchResultItem> results = new ArrayList<>();
+        long total = 0;
 
         if (request.getEntityType() == null || request.getEntityType() == SearchEntityType.BEAT) {
             BeatSearchRequest beatRequest = new BeatSearchRequest();
@@ -45,7 +46,9 @@ public class GlobalSearchService {
             beatRequest.setGenre(request.getGenre());
             beatRequest.setPage(request.getPage());
             beatRequest.setSize(request.getSize());
-            for (BeatSearchResult result : beatSearchService.searchBeats(beatRequest)) {
+            var beatPage = beatSearchService.searchBeats(beatRequest);
+            total += beatPage.getTotal();
+            for (BeatSearchResult result : beatPage.getResults()) {
                 results.add(SearchResultItem.builder()
                         .entityType(SearchEntityType.BEAT)
                         .id(result.getId())
@@ -62,7 +65,9 @@ public class GlobalSearchService {
             studioRequest.setLocation(request.getLocation());
             studioRequest.setPage(request.getPage());
             studioRequest.setSize(request.getSize());
-            for (StudioSearchResult result : studioSearchService.searchStudios(studioRequest)) {
+            var studioPage = studioSearchService.searchStudios(studioRequest);
+            total += studioPage.getTotal();
+            for (StudioSearchResult result : studioPage.getResults()) {
                 results.add(SearchResultItem.builder()
                         .entityType(SearchEntityType.STUDIO)
                         .id(result.getId())
@@ -74,7 +79,10 @@ public class GlobalSearchService {
         }
 
         if (request.getEntityType() == null || request.getEntityType() == SearchEntityType.PRODUCER) {
-            for (ProducerSearchResult result : producerSearchService.search(request.getQuery(), request.getPage(), request.getSize())) {
+            var producerPage = producerSearchService.search(
+                    request.getQuery(), request.getPage(), request.getSize());
+            total += producerPage.getTotal();
+            for (ProducerSearchResult result : producerPage.getResults()) {
                 results.add(SearchResultItem.builder()
                         .entityType(SearchEntityType.PRODUCER)
                         .id(String.valueOf(result.getId()))
@@ -86,7 +94,10 @@ public class GlobalSearchService {
         }
 
         if (request.getEntityType() == null || request.getEntityType() == SearchEntityType.ADVERTISEMENT) {
-            for (AdvertisementSearchResult result : advertisementSearchService.search(request.getQuery(), request.getPage(), request.getSize())) {
+            var advertisementPage = advertisementSearchService.search(
+                    request.getQuery(), request.getPage(), request.getSize());
+            total += advertisementPage.getTotal();
+            for (AdvertisementSearchResult result : advertisementPage.getResults()) {
                 results.add(SearchResultItem.builder()
                         .entityType(SearchEntityType.ADVERTISEMENT)
                         .id(result.getId())
@@ -103,7 +114,7 @@ public class GlobalSearchService {
                 .results(results)
                 .page(request.getPage())
                 .size(request.getSize())
-                .total(results.size())
+                .total(total)
                 .build();
         searchCacheService.cacheSearchResult(cacheKey, response, Duration.ofMinutes(5));
         return response;
