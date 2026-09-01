@@ -20,12 +20,19 @@ public class OtpService {
     private static final int OTP_EXPIRY_MINUTES = 10;
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCKOUT_MINUTES = 10;
+    private static final int MAX_REQUESTS_PER_WINDOW = 3;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final OtpStore otpStore;
     private final PasswordEncoder passwordEncoder;
 
     public String generateAndSave(String identifier) {
+        int requestCount = otpStore.incrementRequestCount(identifier, OTP_EXPIRY_MINUTES * 60L);
+        if (requestCount > MAX_REQUESTS_PER_WINDOW) {
+            throw StudioosException.badRequest(
+                    "Too many OTP requests. Please wait before requesting another code");
+        }
+
         // Invalidate any existing OTPs for this identifier
         otpStore.invalidate(identifier);
 

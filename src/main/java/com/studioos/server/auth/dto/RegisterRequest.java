@@ -4,7 +4,6 @@ import com.studioos.server.shared.enums.Role;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
@@ -22,7 +21,7 @@ public class RegisterRequest {
     @Pattern(regexp = "^\\+?[1-9]\\d{6,14}$", message = "Invalid phone number")
     private String phone;
 
-    @NotNull(message = "Role is required")
+    // Optional during public signup; omitted roles become USER.
     private Role role;
 
     // Optional password for users who want password-based login later

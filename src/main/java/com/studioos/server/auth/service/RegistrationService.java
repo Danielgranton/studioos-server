@@ -32,13 +32,7 @@ public class RegistrationService {
     public OtpSentResponse register(RegisterRequest request) {
         validateRegistration(request);
 
-        User user = User.builder()
-                .name(request.getName())
-                .email(request.getEmail())
-                .phone(request.getPhone())
-                .role(request.getRole())
-                .passwordHash(passwordService.hash(request.getPassword()))
-                .build();
+        User user = findOrCreatePendingUser(request);
 
         userRepository.save(user);
 
@@ -67,17 +61,47 @@ public class RegistrationService {
     }
 
     private void validateRegistration(RegisterRequest request) {
-        if (request.getRole() == null
-                || request.getRole() == Role.ADMIN
+        if (request.getRole() == Role.ADMIN
                 || request.getRole() == Role.SUPER_ADMIN) {
             throw StudioosException.forbidden("Cannot self-register with a privileged role");
         }
-        if (userRepository.existsByEmail(request.getEmail())) {
+    }
+
+    private User findOrCreatePendingUser(RegisterRequest request) {
+        User emailUser = userRepository.findByEmail(request.getEmail()).orElse(null);
+        User phoneUser = userRepository.findByPhone(request.getPhone()).orElse(null);
+
+        if (emailUser != null && emailUser.isAccountVerified()) {
             throw StudioosException.conflict("Email already in use");
         }
-        if (userRepository.existsByPhone(request.getPhone())) {
+        if (phoneUser != null && phoneUser.isAccountVerified()) {
             throw StudioosException.conflict("Phone number already in use");
         }
+        if (emailUser != null && phoneUser != null
+                && !emailUser.getId().equals(phoneUser.getId())) {
+            throw StudioosException.conflict("Email and phone number belong to different accounts");
+        }
+
+        User user = emailUser != null ? emailUser : phoneUser;
+        if (user == null) {
+            return User.builder()
+                    .name(request.getName())
+                    .email(request.getEmail())
+                    .phone(request.getPhone())
+                    .role(request.getRole() == null ? Role.USER : request.getRole())
+                    .passwordHash(passwordService.hash(request.getPassword()))
+                    .build();
+        }
+
+        // Allow an unverified registration to be retried without creating duplicates.
+        user.setName(request.getName());
+        user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+        if (request.getRole() != null) user.setRole(request.getRole());
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            user.setPasswordHash(passwordService.hash(request.getPassword()));
+        }
+        return user;
     }
 
     private String maskEmail(String email) {

@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 public class RedisOtpStore implements OtpStore {
 
     private static final String PREFIX = "studioos:otp:";
+    private static final String REQUEST_PREFIX = "studioos:otp-requests:";
     private static final String CODE_HASH = "codeHash";
     private static final String ATTEMPTS = "failedAttempts";
     private static final String LOCKED_UNTIL = "lockedUntil";
@@ -33,6 +34,14 @@ public class RedisOtpStore implements OtpStore {
               redis.call('HSET', KEYS[1], 'lockedUntil', now + tonumber(ARGV[4]))
             end
             return attempts
+            """, Long.class);
+
+    private static final DefaultRedisScript<Long> INCREMENT_REQUESTS = new DefaultRedisScript<>("""
+            local count = redis.call('INCR', KEYS[1])
+            if count == 1 then
+              redis.call('EXPIRE', KEYS[1], tonumber(ARGV[1]))
+            end
+            return count
             """, Long.class);
 
     private static final DefaultRedisScript<Long> CONSUME = new DefaultRedisScript<>("""
@@ -75,6 +84,15 @@ public class RedisOtpStore implements OtpStore {
     }
 
     @Override
+    public int incrementRequestCount(String identifier, long ttlSeconds) {
+        Long result = redisTemplate.execute(
+                INCREMENT_REQUESTS,
+                List.of(requestKey(identifier)),
+                String.valueOf(ttlSeconds));
+        return result == null ? Integer.MAX_VALUE : result.intValue();
+    }
+
+    @Override
     public int recordFailedAttempt(String identifier, String codeHash, long nowEpochSeconds,
                                    int maxAttempts, long lockoutSeconds) {
         Long result = redisTemplate.execute(
@@ -94,6 +112,10 @@ public class RedisOtpStore implements OtpStore {
 
     private String key(String identifier) {
         return PREFIX + sha256(identifier.trim().toLowerCase());
+    }
+
+    private String requestKey(String identifier) {
+        return REQUEST_PREFIX + sha256(identifier.trim().toLowerCase());
     }
 
     private String value(Object value) {

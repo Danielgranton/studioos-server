@@ -8,6 +8,8 @@ public interface OtpStore {
 
     void invalidate(String identifier);
 
+    int incrementRequestCount(String identifier, long ttlSeconds);
+
     /** Returns the new attempt count, or a negative value when the OTP is unavailable/locked. */
     int recordFailedAttempt(String identifier, String codeHash, long nowEpochSeconds,
                             int maxAttempts, long lockoutSeconds);
