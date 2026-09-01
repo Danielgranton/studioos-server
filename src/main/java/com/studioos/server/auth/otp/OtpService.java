@@ -20,7 +20,8 @@ public class OtpService {
     private static final int OTP_EXPIRY_MINUTES = 10;
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCKOUT_MINUTES = 10;
-    private static final int MAX_REQUESTS_PER_WINDOW = 3;
+    // Allow the initial OTP plus three explicit resend attempts.
+    private static final int MAX_REQUESTS_PER_WINDOW = 4;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final OtpStore otpStore;
