@@ -3,8 +3,8 @@ package com.studioos.server.auth.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.studioos.server.auth.communication.CommunicationClient;
-import com.studioos.server.auth.communication.CommunicationRequestFactory;
+import com.studioos.server.communication.CommunicationClient;
+import com.studioos.server.communication.CommunicationRequestFactory;
 import com.studioos.server.auth.dto.OtpSentResponse;
 import com.studioos.server.auth.dto.RegisterRequest;
 import com.studioos.server.auth.otp.OtpService;
@@ -67,8 +67,10 @@ public class RegistrationService {
     }
 
     private void validateRegistration(RegisterRequest request) {
-        if (request.getRole() == null || request.getRole() == Role.SUPER_ADMIN) {
-            throw StudioosException.forbidden("Cannot self-register as a super admin");
+        if (request.getRole() == null
+                || request.getRole() == Role.ADMIN
+                || request.getRole() == Role.SUPER_ADMIN) {
+            throw StudioosException.forbidden("Cannot self-register with a privileged role");
         }
         if (userRepository.existsByEmail(request.getEmail())) {
             throw StudioosException.conflict("Email already in use");

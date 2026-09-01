@@ -1,7 +1,7 @@
 package com.studioos.server.auth.otp;
 
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,56 +22,41 @@ public class OtpService {
     private static final int LOCKOUT_MINUTES = 10;
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private final OtpRepository otpRepository;
+    private final OtpStore otpStore;
     private final PasswordEncoder passwordEncoder;
 
     public String generateAndSave(String identifier) {
         // Invalidate any existing OTPs for this identifier
-        otpRepository.invalidateAllForIdentifier(identifier);
+        otpStore.invalidate(identifier);
 
         String code = generateCode();
 
-        Otp otp = Otp.builder()
-                .identifier(identifier)
-                .code(passwordEncoder.encode(code))
-                .expiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES))
-                .failedAttempts(0)
-                .lockedUntil(null)
-                .build();
-
-        otpRepository.save(otp);
+        otpStore.save(identifier, passwordEncoder.encode(code), OTP_EXPIRY_MINUTES * 60L);
         log.info("OTP generated for identifier: {}", maskIdentifier(identifier));
         return code;
     }
 
     public void verify(String identifier, String code) {
-        Otp otp = otpRepository
-                .findTopByIdentifierAndUsedFalseOrderByCreatedAtDesc(identifier)
-                .orElseThrow(() -> StudioosException.badRequest("No active OTP found. Please request a new one"));
+        OtpStore.OtpRecord otp = otpStore.find(identifier);
+        if (otp == null) {
+            throw StudioosException.badRequest("No active OTP found. Please request a new one");
+        }
 
-        if (otp.getLockedUntil() != null && LocalDateTime.now().isBefore(otp.getLockedUntil())) {
+        long now = Instant.now().getEpochSecond();
+        if (otp.lockedUntilEpochSeconds() != null && now < otp.lockedUntilEpochSeconds()) {
             throw StudioosException.badRequest("Too many invalid attempts. Please request a new OTP");
         }
 
-        if (otp.isExpired()) {
-            throw StudioosException.badRequest("OTP has expired. Please request a new one");
-        }
-
-        if (!passwordEncoder.matches(code, otp.getCode())) {
-            int nextAttempts = otp.getFailedAttempts() == null ? 1 : otp.getFailedAttempts() + 1;
-            otp.setFailedAttempts(nextAttempts);
-            if (nextAttempts >= MAX_FAILED_ATTEMPTS) {
-                otp.setLockedUntil(LocalDateTime.now().plusMinutes(LOCKOUT_MINUTES));
+        if (!passwordEncoder.matches(code, otp.codeHash())) {
+            int nextAttempts = otpStore.recordFailedAttempt(
+                    identifier, otp.codeHash(), now, MAX_FAILED_ATTEMPTS, LOCKOUT_MINUTES * 60L);
+            if (nextAttempts == -2) {
+                throw StudioosException.badRequest("Too many invalid attempts. Please request a new OTP");
             }
-            otpRepository.save(otp);
             throw StudioosException.badRequest("Invalid OTP");
         }
 
-        // Mark as used
-        otp.setUsed(true);
-        otp.setFailedAttempts(0);
-        otp.setLockedUntil(null);
-        otpRepository.save(otp);
+        otpStore.consume(identifier, otp.codeHash());
         log.info("OTP verified for identifier: {}", maskIdentifier(identifier));
     }
 

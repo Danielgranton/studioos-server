@@ -1,4 +1,4 @@
-package com.studioos.server.auth.communication;
+package com.studioos.server.communication;
 
 import java.util.Map;
 

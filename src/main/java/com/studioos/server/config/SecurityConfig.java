@@ -93,6 +93,9 @@ public class SecurityConfig {
 
                         // ───────────── ADMIN ─────────────
 
+                        .requestMatchers("/admin/search/reindex")
+                        .hasAnyRole(Role.ADMIN.name(), Role.SUPER_ADMIN.name())
+
                         .requestMatchers("/admin/**")
                         .hasRole(Role.SUPER_ADMIN.name())
 

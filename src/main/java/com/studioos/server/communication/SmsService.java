@@ -1,4 +1,4 @@
-package com.studioos.server.notification;
+package com.studioos.server.communication;
 
 import com.africastalking.AfricasTalking;
 import org.springframework.scheduling.annotation.Async;
@@ -10,12 +10,6 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 @Service
 public class SmsService {
-
-    private final AfricasTalkingProperties properties;
-
-    public SmsService(AfricasTalkingProperties properties) {
-        this.properties = properties;
-    }
 
     @Async
     public CompletableFuture<Boolean> sendOtp(String phone, String otp) {

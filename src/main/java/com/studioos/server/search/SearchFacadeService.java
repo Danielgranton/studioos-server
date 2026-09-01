@@ -76,6 +76,6 @@ public class SearchFacadeService {
 
     public SearchReindexResponse reindexAll() {
         searchIndexService.reindexAll();
-        return SearchReindexResponse.builder().success(true).message("Search reindex started").build();
+        return SearchReindexResponse.builder().success(true).message("Search reindex completed").build();
     }
 }

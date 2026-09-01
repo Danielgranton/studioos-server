@@ -3,10 +3,10 @@ package com.studioos.server.auth.otp;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
-import java.time.LocalDateTime;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.studioos.server.shared.exceptions.StudioosException;
@@ -21,31 +21,26 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 class OtpServiceTest {
 
     @Mock
-    private OtpRepository otpRepository;
+    private OtpStore otpStore;
     @Mock
     private PasswordEncoder passwordEncoder;
 
     @Test
     void locksOtpAfterRepeatedInvalidAttempts() {
-        AtomicReference<Otp> stored = new AtomicReference<>(Otp.builder()
-                .identifier("user@example.com")
-                .code("hashed-valid")
-                .expiresAt(LocalDateTime.now().plusMinutes(10))
-                .failedAttempts(0)
-                .lockedUntil(null)
-                .used(false)
-                .build());
+        AtomicReference<OtpStore.OtpRecord> stored = new AtomicReference<>(
+                new OtpStore.OtpRecord("hashed-valid", 0, null));
 
-        when(otpRepository.findTopByIdentifierAndUsedFalseOrderByCreatedAtDesc("user@example.com"))
-                .thenAnswer(invocation -> Optional.ofNullable(stored.get()));
+        when(otpStore.find("user@example.com")).thenAnswer(invocation -> stored.get());
         when(passwordEncoder.matches("000000", "hashed-valid")).thenReturn(false);
-        when(otpRepository.save(any(Otp.class))).thenAnswer(invocation -> {
-            Otp otp = invocation.getArgument(0);
-            stored.set(otp);
-            return otp;
+        when(otpStore.recordFailedAttempt(any(), any(), anyLong(), anyInt(), anyLong()))
+                .thenAnswer(invocation -> {
+                    int attempts = stored.get().failedAttempts() + 1;
+                    stored.set(new OtpStore.OtpRecord(
+                            "hashed-valid", attempts, attempts >= 5 ? Long.MAX_VALUE : null));
+                    return attempts;
         });
 
-        OtpService otpService = new OtpService(otpRepository, passwordEncoder);
+        OtpService otpService = new OtpService(otpStore, passwordEncoder);
 
         for (int i = 0; i < 5; i++) {
             assertThatThrownBy(() -> otpService.verify("user@example.com", "000000"))
@@ -53,8 +48,8 @@ class OtpServiceTest {
                     .hasMessageContaining("Invalid OTP");
         }
 
-        assertThat(stored.get().getFailedAttempts()).isEqualTo(5);
-        assertThat(stored.get().getLockedUntil()).isNotNull();
+        assertThat(stored.get().failedAttempts()).isEqualTo(5);
+        assertThat(stored.get().lockedUntilEpochSeconds()).isNotNull();
 
         assertThatThrownBy(() -> otpService.verify("user@example.com", "123456"))
                 .isInstanceOf(StudioosException.class)

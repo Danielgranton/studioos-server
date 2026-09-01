@@ -20,16 +20,21 @@ spring:
 
   # ─── EMAIL (SMTP) ───
   mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    host: ${COMMUNICATION_SMTP_HOST:${MAIL_HOST:smtp.gmail.com}}
+    port: ${COMMUNICATION_SMTP_PORT:${MAIL_PORT:587}}
+    username: ${COMMUNICATION_SMTP_USERNAME:${MAIL_USERNAME:}}
+    password: ${COMMUNICATION_SMTP_PASSWORD:${MAIL_PASSWORD:}}
     properties:
       mail:
         smtp:
-          auth: true
+          auth: ${COMMUNICATION_SMTP_AUTH:true}
           starttls:
-            enable: true
+            enable: ${COMMUNICATION_SMTP_STARTTLS:true}
+
+communication:
+  email:
+    from: ${COMMUNICATION_EMAIL_FROM:${COMMUNICATION_SMTP_USERNAME:${MAIL_USERNAME:}}}
+    from-name: ${COMMUNICATION_EMAIL_FROM_NAME:StudioOS}
 
 # ─── ASYNC (for email/sms sending) ───
   task:
@@ -81,7 +86,7 @@ spring:
 server:
   port: ${PORT:8080}
   servlet:
-    context-path: /api
+    context-path: /api/v1
   error:
     include-message: always
     include-binding-errors: always
@@ -145,6 +150,15 @@ opensearch:
 search:
   indexing:
     init-on-startup: true
+
+# ─── ONE-TIME ADMIN BOOTSTRAP ───
+# Run with --bootstrap-super-admin and provide these values through deployment secrets.
+bootstrap:
+  super-admin:
+    email: ${BOOTSTRAP_SUPER_ADMIN_EMAIL:}
+    name: ${BOOTSTRAP_SUPER_ADMIN_NAME:StudioOS Super Admin}
+    phone: ${BOOTSTRAP_SUPER_ADMIN_PHONE:}
+    password: ${BOOTSTRAP_SUPER_ADMIN_PASSWORD:}
 
 # ─── ACTUATOR ───
 management:

@@ -1,4 +1,4 @@
-package com.studioos.server.notification;
+package com.studioos.server.communication;
 
 import com.africastalking.AfricasTalking;
 import jakarta.annotation.PostConstruct;
@@ -18,7 +18,6 @@ public class AfricasTalkingConfig {
         if (!StringUtils.hasText(properties.getUsername()) || !StringUtils.hasText(properties.getApikey())) {
             return;
         }
-
         AfricasTalking.initialize(properties.getUsername(), properties.getApikey());
     }
 }

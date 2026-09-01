@@ -1,4 +1,4 @@
-package com.studioos.server.auth.communication;
+package com.studioos.server.communication;
 
 public enum CommunicationType {
     OTP,

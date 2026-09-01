@@ -64,7 +64,7 @@ export $(cat .env | xargs)
 ./mvnw spring-boot:run
 ```
 
-The API runs at `http://localhost:8080/api` by default.
+The API runs at `http://localhost:8080/api/v1` by default.
 
 ## Run with gRPC media enabled
 

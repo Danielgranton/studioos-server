@@ -4,5 +4,6 @@ public enum Role {
     USER,
     ARTIST,
     PRODUCER,
+    ADMIN,
     SUPER_ADMIN
 }

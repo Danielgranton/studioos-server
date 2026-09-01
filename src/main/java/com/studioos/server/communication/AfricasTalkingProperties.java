@@ -1,4 +1,4 @@
-package com.studioos.server.notification;
+package com.studioos.server.communication;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;

@@ -9,8 +9,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.studioos.server.auth.communication.CommunicationClient;
-import com.studioos.server.auth.communication.CommunicationRequestFactory;
+import com.studioos.server.communication.CommunicationClient;
+import com.studioos.server.communication.CommunicationRequestFactory;
 import com.studioos.server.auth.dto.ChangePasswordRequest;
 import com.studioos.server.auth.password.PasswordResetToken;
 import com.studioos.server.auth.password.PasswordResetTokenRepository;

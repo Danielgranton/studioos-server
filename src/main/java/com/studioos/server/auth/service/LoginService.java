@@ -3,8 +3,8 @@ package com.studioos.server.auth.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.studioos.server.auth.communication.CommunicationClient;
-import com.studioos.server.auth.communication.CommunicationRequestFactory;
+import com.studioos.server.communication.CommunicationClient;
+import com.studioos.server.communication.CommunicationRequestFactory;
 import com.studioos.server.auth.dto.LoginRequest;
 import com.studioos.server.auth.dto.OtpSentResponse;
 import com.studioos.server.auth.otp.OtpService;
