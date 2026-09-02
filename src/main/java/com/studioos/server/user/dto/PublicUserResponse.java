@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 public class PublicUserResponse {
     private Integer id;
     private String name;
+    private String username;
     private Role role;
     private String bio;
     private String location;

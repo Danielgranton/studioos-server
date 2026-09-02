@@ -8,6 +8,7 @@ import com.studioos.server.shared.media.ResponsiveImageAsset;
 import com.studioos.server.shared.media.ResponsiveImageProcessingService;
 import com.studioos.server.user.dto.PublicUserResponse;
 import com.studioos.server.user.dto.UpdateProfileRequest;
+import com.studioos.server.user.dto.UpdateUsernameRequest;
 import com.studioos.server.user.dto.UserProfileResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,33 @@ public class UserService {
         return toProfileResponse(user);
     }
 
+    @Transactional
+    public UserProfileResponse updateUsername(User currentUser, UpdateUsernameRequest request) {
+        String username = request == null || request.getUsername() == null
+                ? ""
+                : request.getUsername().trim().toLowerCase();
+
+        if (!username.matches("[a-z0-9_]{3,30}")) {
+            throw StudioosException.badRequest(
+                    "Username must be 3-30 characters and use only letters, numbers, or underscores");
+        }
+
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> StudioosException.notFound("User not found"));
+
+        if (username.equals(user.getUsername())) {
+            return toProfileResponse(user);
+        }
+        if (userRepository.existsByUsername(username)) {
+            throw StudioosException.conflict("Username is already in use");
+        }
+
+        user.setUsername(username);
+        userRepository.save(user);
+        log.info("Username updated for user id: {}", user.getId());
+        return toProfileResponse(user);
+    }
+
     // ─── Get any user's public profile ───
     public PublicUserResponse getUserById(Integer id) {
         User user = userRepository.findById(id)
@@ -58,6 +86,7 @@ public class UserService {
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .name(user.getName())
+                .username(user.getUsername())
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .role(user.getRole())
@@ -80,6 +109,7 @@ public class UserService {
         return PublicUserResponse.builder()
                 .id(user.getId())
                 .name(user.getName())
+                .username(user.getUsername())
                 .role(user.getRole())
                 .bio(user.getBio())
                 .location(user.getLocation())

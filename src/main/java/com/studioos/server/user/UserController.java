@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.studioos.server.shared.dto.ApiResponse;
 import com.studioos.server.user.dto.PublicUserResponse;
 import com.studioos.server.user.dto.UpdateProfileRequest;
+import com.studioos.server.user.dto.UpdateUsernameRequest;
 import com.studioos.server.user.dto.UserProfileResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,15 @@ public class UserController {
     ) {
         UserProfileResponse updated = userService.updateProfile(currentUser, request);
         return ResponseEntity.ok(ApiResponse.success("Profile updated successfully", updated));
+    }
+
+    @PutMapping("/username")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> updateUsername(
+            @AuthenticationPrincipal User currentUser,
+            @RequestBody UpdateUsernameRequest request
+    ) {
+        UserProfileResponse updated = userService.updateUsername(currentUser, request);
+        return ResponseEntity.ok(ApiResponse.success("Username updated successfully", updated));
     }
 
     // ─── Get any user's public profile ───
