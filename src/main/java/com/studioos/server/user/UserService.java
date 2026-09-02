@@ -2,9 +2,15 @@ package com.studioos.server.user;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.studioos.server.shared.exceptions.StudioosException;
+import com.studioos.server.shared.audit.AccountAuditService;
+import com.studioos.server.shared.enums.AuditEventType;
 import com.studioos.server.shared.media.ResponsiveImageAsset;
+import com.studioos.server.shared.storage.PresignedUrlService;
+import com.studioos.server.auth.service.ProfileImageServiceClient;
 import com.studioos.server.shared.media.ResponsiveImageProcessingService;
 import com.studioos.server.user.dto.PublicUserResponse;
 import com.studioos.server.user.dto.UpdateProfileRequest;
@@ -21,6 +27,13 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final ResponsiveImageProcessingService responsiveImageProcessingService;
+    private final ProfileImageServiceClient profileImageServiceClient;
+    private final PresignedUrlService presignedUrlService;
+    private final AccountAuditService accountAuditService;
+    private final PrivacySettingsService privacySettingsService;
+
+    @Value("${storage.s3.profile-url-expiry-seconds:3600}")
+    private int profileUrlExpirySeconds;
 
     // ─── Get own profile ───
     public UserProfileResponse getMyProfile(User currentUser) {
@@ -43,6 +56,7 @@ public class UserService {
         if (request.getLink() != null) user.setLink(request.getLink());
 
         userRepository.save(user);
+        accountAuditService.record(AuditEventType.PROFILE_UPDATED, user, "Profile details updated");
         log.info("Profile updated for user: {}", user.getEmail());
         return toProfileResponse(user);
     }
@@ -70,14 +84,50 @@ public class UserService {
 
         user.setUsername(username);
         userRepository.save(user);
+        accountAuditService.record(AuditEventType.USERNAME_CHANGED, user, "Username changed");
         log.info("Username updated for user id: {}", user.getId());
         return toProfileResponse(user);
+    }
+
+    @Transactional
+    public UserProfileResponse updateProfileImage(User currentUser, MultipartFile file) {
+        if (currentUser == null) throw StudioosException.unauthorized("Authentication required");
+        if (file == null || file.isEmpty()) throw StudioosException.badRequest("Profile image is required");
+        if (file.getSize() > 5L * 1024L * 1024L) {
+            throw StudioosException.badRequest("Profile image must not exceed 5 MB");
+        }
+        String contentType = file.getContentType();
+        if (!"image/jpeg".equals(contentType)
+                && !"image/png".equals(contentType)
+                && !"image/webp".equals(contentType)) {
+            throw StudioosException.badRequest("Only image files are supported");
+        }
+
+        try {
+            User user = userRepository.findById(currentUser.getId())
+                    .orElseThrow(() -> StudioosException.notFound("User not found"));
+            ResponsiveImageAsset image;
+            try (var input = file.getInputStream()) {
+                image = profileImageServiceClient.processUploadedProfileImage(
+                        input, file.getSize(), file.getOriginalFilename(), contentType,
+                        "users/" + user.getId() + "/profile", String.valueOf(user.getId()));
+            }
+            applyImage(user, image);
+            userRepository.save(user);
+            accountAuditService.record(AuditEventType.PROFILE_IMAGE_CHANGED, user, "Profile image changed");
+            return toProfileResponse(user);
+        } catch (java.io.IOException e) {
+            throw StudioosException.badRequest("Could not read profile image");
+        }
     }
 
     // ─── Get any user's public profile ───
     public PublicUserResponse getUserById(Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> StudioosException.notFound("User not found"));
+        if (!privacySettingsService.isProfileDiscoverable(user.getId())) {
+            throw StudioosException.notFound("User not found");
+        }
         return toPublicResponse(user);
     }
 
@@ -94,10 +144,10 @@ public class UserService {
                 .location(user.getLocation())
                 .genre(user.getGenre())
                 .experience(user.getExperience())
-                .profileImage(user.getProfileImage())
-                .profileImageLarge(user.getProfileImageLarge())
-                .profileImageMedium(user.getProfileImageMedium())
-                .profileImageThumbnail(user.getProfileImageThumbnail())
+                .profileImage(resolveImageUrl(user.getProfileImage()))
+                .profileImageLarge(resolveImageUrl(user.getProfileImageLarge()))
+                .profileImageMedium(resolveImageUrl(user.getProfileImageMedium()))
+                .profileImageThumbnail(resolveImageUrl(user.getProfileImageThumbnail()))
                 .instagram(user.getInstagram())
                 .youtube(user.getYoutube())
                 .link(user.getLink())
@@ -106,19 +156,22 @@ public class UserService {
     }
 
     private PublicUserResponse toPublicResponse(User user) {
+        PrivacySettings privacy = privacySettingsService.getEntityOrDefaults(user.getId());
         return PublicUserResponse.builder()
                 .id(user.getId())
                 .name(user.getName())
                 .username(user.getUsername())
+                .email(privacy.isEmailVisible() ? user.getEmail() : null)
+                .phone(privacy.isPhoneVisible() ? user.getPhone() : null)
                 .role(user.getRole())
                 .bio(user.getBio())
                 .location(user.getLocation())
                 .genre(user.getGenre())
                 .experience(user.getExperience())
-                .profileImage(user.getProfileImage())
-                .profileImageLarge(user.getProfileImageLarge())
-                .profileImageMedium(user.getProfileImageMedium())
-                .profileImageThumbnail(user.getProfileImageThumbnail())
+                .profileImage(resolveImageUrl(user.getProfileImage()))
+                .profileImageLarge(resolveImageUrl(user.getProfileImageLarge()))
+                .profileImageMedium(resolveImageUrl(user.getProfileImageMedium()))
+                .profileImageThumbnail(resolveImageUrl(user.getProfileImageThumbnail()))
                 .instagram(user.getInstagram())
                 .youtube(user.getYoutube())
                 .link(user.getLink())
@@ -133,9 +186,25 @@ public class UserService {
             return;
         }
 
+        applyImage(user, image);
+    }
+
+    private void applyImage(User user, ResponsiveImageAsset image) {
+        if (image == null) return;
         user.setProfileImage(image.getOriginalUrl());
         user.setProfileImageLarge(image.getLargeUrl());
         user.setProfileImageMedium(image.getMediumUrl());
         user.setProfileImageThumbnail(image.getThumbnailUrl());
+    }
+
+    private String resolveImageUrl(String reference) {
+        if (reference == null || !reference.startsWith("s3://")) return reference;
+        String remainder = reference.substring("s3://".length());
+        int separator = remainder.indexOf('/');
+        if (separator <= 0 || separator == remainder.length() - 1) return reference;
+        return presignedUrlService.generateDownloadUrl(
+                remainder.substring(0, separator),
+                remainder.substring(separator + 1),
+                profileUrlExpirySeconds);
     }
 }

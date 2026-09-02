@@ -11,4 +11,6 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, String> {
     List<AuditLog> findByEntityId(String entityId);
 
     List<AuditLog> findByEventType(AuditEventType eventType);
+
+    List<AuditLog> findByUserIdOrderByCreatedAtDesc(Integer userId);
 }

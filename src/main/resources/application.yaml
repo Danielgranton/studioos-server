@@ -106,8 +106,19 @@ internal:
 
 media:
   service:
-    host: ${MEDIA_SERVICE_HOST:localhost}
+    host: ${MEDIA_SERVICE_HOST:127.0.0.1}
     port: ${MEDIA_SERVICE_PORT:50051}
+    rpc-timeout-ms: ${MEDIA_RPC_TIMEOUT_MS:30000}
+    upload-timeout-ms: ${MEDIA_UPLOAD_TIMEOUT_MS:60000}
+    retry:
+      max-attempts: ${MEDIA_RETRY_MAX_ATTEMPTS:3}
+      initial-backoff-ms: ${MEDIA_RETRY_INITIAL_BACKOFF_MS:100}
+      max-backoff-ms: ${MEDIA_RETRY_MAX_BACKOFF_MS:1000}
+    tls:
+      enabled: ${MEDIA_TLS_ENABLED:false}
+      trust-certificates: ${MEDIA_TLS_CA_FILE:}
+      client-certificate: ${MEDIA_TLS_CLIENT_CERT_FILE:}
+      client-key: ${MEDIA_TLS_CLIENT_KEY_FILE:}
   callback:
     grpc:
       enabled: ${MEDIA_CALLBACK_GRPC_ENABLED:true}

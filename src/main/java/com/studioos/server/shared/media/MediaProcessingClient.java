@@ -1,5 +1,7 @@
 package com.studioos.server.shared.media;
 
+import java.io.InputStream;
+
 public interface MediaProcessingClient {
 
     /**
@@ -22,4 +24,8 @@ public interface MediaProcessingClient {
      * Processes a responsive image and returns the generated URLs.
      */
     MediaResponsiveImageResult processResponsiveImage(String assetReference, String objectKeyPrefix, int quality);
+
+    /** Streams an uploaded asset into the media service and returns its reference. */
+    String uploadMedia(InputStream content, long contentLength, String filename,
+            String contentType, String ownerId);
 }

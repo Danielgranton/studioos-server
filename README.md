@@ -43,6 +43,15 @@ Common environment variables:
 - `INTERNAL_SERVICE_API_KEY`
 - `MEDIA_SERVICE_HOST` default: `localhost`
 - `MEDIA_SERVICE_PORT` default: `50051`
+- `MEDIA_RPC_TIMEOUT_MS` media RPC deadline, default: `30000`
+- `MEDIA_UPLOAD_TIMEOUT_MS` media upload deadline, default: `60000`
+- `MEDIA_RETRY_MAX_ATTEMPTS` retry count for transient safe media calls, default: `3`
+- `MEDIA_RETRY_INITIAL_BACKOFF_MS` initial retry backoff, default: `100`
+- `MEDIA_RETRY_MAX_BACKOFF_MS` maximum retry backoff, default: `1000`
+- `MEDIA_TLS_ENABLED` enables mTLS for the media gRPC connection
+- `MEDIA_TLS_CA_FILE` CA certificate used to verify the media service
+- `MEDIA_TLS_CLIENT_CERT_FILE` client certificate presented to the media service
+- `MEDIA_TLS_CLIENT_KEY_FILE` private key for the client certificate
 - `MEDIA_CALLBACK_GRPC_ENABLED` default: `true`
 - `MEDIA_CALLBACK_GRPC_HOST` default: `0.0.0.0`
 - `MEDIA_CALLBACK_GRPC_PORT` default: `50052`

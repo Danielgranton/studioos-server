@@ -1,6 +1,10 @@
 package com.studioos.server.shared.media;
 
 import java.util.UUID;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -50,5 +54,16 @@ public class StubMediaProcessingClient implements MediaProcessingClient {
                         ResponsiveImageVariant.builder().size(128).url(base + "/128.webp").build(),
                         ResponsiveImageVariant.builder().size(64).url(base + "/64.webp").build()))
                 .build();
+    }
+
+    @Override
+    public String uploadMedia(InputStream content, long contentLength, String filename, String contentType, String ownerId) {
+        try {
+            Path file = Files.createTempFile("studioos-profile-", ".upload");
+            Files.copy(content, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return file.toAbsolutePath().toString();
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not store uploaded image", e);
+        }
     }
 }

@@ -11,6 +11,8 @@ import com.studioos.server.auth.otp.OtpService;
 import com.studioos.server.communication.CommunicationClient;
 import com.studioos.server.communication.CommunicationRequestFactory;
 import com.studioos.server.shared.exceptions.StudioosException;
+import com.studioos.server.shared.audit.AccountAuditService;
+import com.studioos.server.shared.enums.AuditEventType;
 import com.studioos.server.user.User;
 import com.studioos.server.user.UserRepository;
 
@@ -26,6 +28,7 @@ public class EmailChangeService {
     private final UserRepository userRepository;
     private final TokenService tokenService;
     private final SessionService sessionService;
+    private final AccountAuditService accountAuditService;
 
     @Transactional
     public OtpSentResponse request(User user, EmailChangeRequest request) {
@@ -66,6 +69,7 @@ public class EmailChangeService {
         user.setEmail(newEmail);
         user.setEmailVerified(true);
         userRepository.save(user);
+        accountAuditService.record(AuditEventType.EMAIL_CHANGED, user, "Account email changed");
 
         // Existing JWT subjects contain the old email, so rotate all sessions.
         sessionService.logoutAllDevices(user);

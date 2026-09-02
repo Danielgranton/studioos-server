@@ -110,6 +110,8 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    private LocalDateTime deletedAt;
+
     // ─── UserDetails impl ───
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -132,5 +134,5 @@ public class User implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
 
     @Override
-    public boolean isEnabled() { return accountVerified; }
+    public boolean isEnabled() { return accountVerified && deletedAt == null; }
 }

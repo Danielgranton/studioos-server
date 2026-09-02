@@ -50,6 +50,11 @@ public class AuditLog {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    private String ipAddress;
+
+    @Column(length = 500)
+    private String userAgent;
+
     // ─── Audit ───
     @CreatedDate
     @Column(nullable = false, updatable = false)

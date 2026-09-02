@@ -20,6 +20,8 @@ import com.studioos.server.auth.dto.OtpSentResponse;
 import com.studioos.server.auth.dto.ResetPasswordRequest;
 import com.studioos.server.auth.dto.AuthResponse;
 import com.studioos.server.shared.exceptions.StudioosException;
+import com.studioos.server.shared.audit.AccountAuditService;
+import com.studioos.server.shared.enums.AuditEventType;
 import com.studioos.server.user.User;
 import com.studioos.server.user.UserRepository;
 
@@ -41,6 +43,7 @@ public class PasswordResetService {
     private final TokenService tokenService;
     private final SessionService sessionService;
     private final PasswordEncoder passwordEncoder;
+    private final AccountAuditService accountAuditService;
 
     @Transactional
     public OtpSentResponse forgotPassword(ForgotPasswordRequest request) {
@@ -100,9 +103,14 @@ public class PasswordResetService {
                 && !passwordService.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             throw StudioosException.badRequest("Current password is invalid");
         }
+        if (passwordService.hasPassword(user)
+                && passwordService.matches(request.getNewPassword(), user.getPasswordHash())) {
+            throw StudioosException.badRequest("New password must be different from your current password");
+        }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+        accountAuditService.record(AuditEventType.PASSWORD_CHANGED, user, "Account password changed");
         sessionService.logoutAllDevices(user);
         AuthResponse response = tokenService.issue(user);
         sessionService.recordSession(user, response.getRefreshToken());
