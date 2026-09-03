@@ -99,6 +99,7 @@ jwt:
 
 auth:
   cookies-secure: ${AUTH_COOKIES_SECURE:false}
+  cookie-path: ${AUTH_COOKIE_PATH:/}
 
 internal:
   service:

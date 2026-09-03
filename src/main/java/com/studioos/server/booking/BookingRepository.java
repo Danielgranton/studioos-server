@@ -40,5 +40,6 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     Optional<Booking> findByIdAndArtistId(String bookingId, Integer artistId);
 
     List<Booking> findByStudioIdIn(List<String> studioIds);
+    List<Booking> findByStudioIdInAndStatus(List<String> studioIds, BookingStatus status);
     List<Booking> findByStudioIdInAndPaymentStatus(List<String> studioIds, BookingPaymentStatus paymentStatus);
 }

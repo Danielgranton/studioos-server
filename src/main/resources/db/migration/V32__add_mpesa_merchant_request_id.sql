@@ -1,1 +1,1 @@
-ALTER TABLE transactions ADD COLUMN mpesa_merchant_request_id VARCHAR(50);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS mpesa_merchant_request_id VARCHAR(50);
