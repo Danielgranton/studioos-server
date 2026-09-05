@@ -22,10 +22,16 @@ public class AuthCookieService {
     @Value("${auth.cookie-path:/}")
     private String cookiePath;
 
+    @Value("${jwt.expiration}")
+    private long accessTokenExpiration;
+
+    @Value("${jwt.refresh-expiration}")
+    private long refreshTokenExpiration;
+
     public void addAuthCookies(HttpServletResponse response, AuthResponse auth) {
         expireLegacyCookies(response);
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie(ACCESS_COOKIE, auth.getAccessToken(), 86400, cookiePath).toString());
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie(REFRESH_COOKIE, auth.getRefreshToken(), 604800, cookiePath).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie(ACCESS_COOKIE, auth.getAccessToken(), seconds(accessTokenExpiration), cookiePath).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie(REFRESH_COOKIE, auth.getRefreshToken(), seconds(refreshTokenExpiration), cookiePath).toString());
     }
 
     public void clearAuthCookies(HttpServletResponse response) {
@@ -50,5 +56,9 @@ public class AuthCookieService {
                 .path(path)
                 .maxAge(maxAge)
                 .build();
+    }
+
+    private long seconds(long milliseconds) {
+        return Math.max(0, milliseconds / 1000);
     }
 }

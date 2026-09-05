@@ -59,6 +59,8 @@ public class SecurityConfig {
                         .requestMatchers("/auth/password/forgot").permitAll()
                         .requestMatchers("/auth/password/reset").permitAll()
 
+                        .requestMatchers("/auth/oauth2/google", "/auth/oauth2/google/callback").permitAll()
+
                         .requestMatchers("/auth/logout").authenticated()
                         .requestMatchers("/auth/sessions/**").authenticated()
                         .requestMatchers("/auth/password/change").authenticated()

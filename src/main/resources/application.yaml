@@ -101,6 +101,15 @@ auth:
   cookies-secure: ${AUTH_COOKIES_SECURE:false}
   cookie-path: ${AUTH_COOKIE_PATH:/}
 
+google:
+  oauth:
+    enabled: ${GOOGLE_OAUTH_ENABLED:false}
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${GOOGLE_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth2/google/callback}
+    frontend-success-url: ${GOOGLE_OAUTH_FRONTEND_SUCCESS_URL:http://localhost:3000/auth/oauth/callback}
+    frontend-error-url: ${GOOGLE_OAUTH_FRONTEND_ERROR_URL:http://localhost:3000/auth/signin?oauth=error}
+
 internal:
   service:
     api-key: ${INTERNAL_SERVICE_API_KEY:}

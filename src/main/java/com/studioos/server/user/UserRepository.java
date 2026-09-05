@@ -11,6 +11,7 @@ import com.studioos.server.shared.enums.Role;
 @Repository
 public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByEmail(String email);
+    Optional<User> findByGoogleSubject(String googleSubject);
     Optional<User> findByPhone(String phone);
     Optional<User> findByEmailOrPhone(String email, String phone);
     List<User> findByRole(Role role);

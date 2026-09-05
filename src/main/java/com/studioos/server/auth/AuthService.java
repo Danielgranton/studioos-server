@@ -44,6 +44,10 @@ public class AuthService {
         return verificationService.verifyLogin(request);
     }
 
+    public AuthResponse googleLogin(String subject, String email, String name) {
+        return verificationService.googleLogin(subject, email, name);
+    }
+
     public OtpSentResponse resendOtp(LoginRequest request) {
         return loginService.resendOtp(request);
     }
@@ -56,8 +60,8 @@ public class AuthService {
         sessionService.logout(request);
     }
 
-    public java.util.List<SessionResponse> sessions(User user) {
-        return sessionService.listActiveSessions(user);
+    public java.util.List<SessionResponse> sessions(User user, String refreshToken) {
+        return sessionService.listActiveSessions(user, refreshToken);
     }
 
     public void revokeSession(User user, String sessionId) {

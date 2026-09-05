@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import java.util.Locale;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
@@ -54,10 +55,14 @@ public class SessionService {
                 .expiresAt(tokenService.extractExpiration(refreshToken).toInstant()
                         .atZone(java.time.ZoneId.systemDefault()).toLocalDateTime())
                 .createdAt(LocalDateTime.now())
-                .deviceId(metadata.deviceId())
+                .deviceId(UUID.randomUUID().toString())
                 .deviceName(metadata.deviceName())
                 .userAgent(metadata.userAgent())
                 .ipAddress(metadata.ipAddress())
+                .deviceType(metadata.deviceType())
+                .browser(metadata.browser())
+                .operatingSystem(metadata.operatingSystem())
+                .lastActiveAt(LocalDateTime.now())
                 .build());
     }
 
@@ -85,17 +90,23 @@ public class SessionService {
         revokeCurrentSession(request.getRefreshToken());
     }
 
+    @Transactional
     public boolean isSessionActive(String refreshToken) {
-        return refreshSessionRepository.findByTokenHashAndRevokedAtIsNull(hash(refreshToken)).isPresent();
+        return refreshSessionRepository.findByTokenHashAndRevokedAtIsNull(hash(refreshToken))
+                .map(session -> {
+                    session.setLastActiveAt(LocalDateTime.now());
+                    refreshSessionRepository.save(session);
+                    return session.getExpiresAt() != null && session.getExpiresAt().isAfter(LocalDateTime.now());
+                }).orElse(false);
     }
 
     @Transactional(readOnly = true)
-    public List<SessionResponse> listActiveSessions(User user) {
+    public List<SessionResponse> listActiveSessions(User user, String refreshToken) {
         if (user == null) {
             throw StudioosException.unauthorized("Authentication required");
         }
         return refreshSessionRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
-                .map(this::toResponse)
+                .map(session -> toResponse(session, refreshToken != null && session.getTokenHash().equals(hash(refreshToken))))
                 .toList();
     }
 
@@ -147,18 +158,29 @@ public class SessionService {
         }
     }
 
-    private SessionResponse toResponse(RefreshSession session) {
+    private SessionResponse toResponse(RefreshSession session, boolean currentSession) {
+        String browser = firstNonBlank(session.getBrowser(), detectBrowser(session.getUserAgent()));
+        String operatingSystem = firstNonBlank(session.getOperatingSystem(), detectOperatingSystem(session.getUserAgent()));
+        String deviceType = firstNonBlank(session.getDeviceType(), detectDeviceType(session.getUserAgent()));
+        String deviceName = firstNonBlank(session.getDeviceName(), browser + " on " + operatingSystem);
         return SessionResponse.builder()
                 .sessionId(session.getId())
                 .userId(session.getUserId())
                 .deviceId(session.getDeviceId())
-                .deviceName(session.getDeviceName())
+                .deviceName(deviceName)
                 .userAgent(session.getUserAgent())
                 .ipAddress(session.getIpAddress())
+                .deviceType(deviceType)
+                .browser(browser)
+                .operatingSystem(operatingSystem)
+                .lastActiveAt(firstNonBlankDate(session.getLastActiveAt(), session.getCreatedAt()))
+                .currentSession(currentSession)
                 .createdAt(session.getCreatedAt())
                 .expiresAt(session.getExpiresAt())
                 .revokedAt(session.getRevokedAt())
-                .active(session.getRevokedAt() == null)
+                .active(session.getRevokedAt() == null
+                        && session.getExpiresAt() != null
+                        && session.getExpiresAt().isAfter(LocalDateTime.now()))
                 .build();
     }
 
@@ -169,20 +191,15 @@ public class SessionService {
         }
 
         HttpServletRequest request = servletAttributes.getRequest();
-        String deviceName = firstNonBlank(
-                request.getHeader("X-Device-Name"),
-                request.getHeader("X-Client-Name"),
-                request.getHeader("X-App-Name"));
-        String deviceId = firstNonBlank(
-                request.getHeader("X-Device-Id"),
-                request.getHeader("X-Client-Id"),
-                request.getHeader("X-Session-Id"));
         String userAgent = request.getHeader("User-Agent");
         String ipAddress = firstNonBlank(
                 request.getHeader("X-Forwarded-For"),
                 request.getRemoteAddr());
 
-        return new RequestMetadata(deviceId, deviceName, userAgent, ipAddress);
+        String browser = detectBrowser(userAgent);
+        String operatingSystem = detectOperatingSystem(userAgent);
+        String deviceType = detectDeviceType(userAgent);
+        return new RequestMetadata(browser + " on " + operatingSystem, userAgent, ipAddress, deviceType, browser, operatingSystem);
     }
 
     private String firstNonBlank(String... values) {
@@ -194,9 +211,39 @@ public class SessionService {
         return null;
     }
 
-    private record RequestMetadata(String deviceId, String deviceName, String userAgent, String ipAddress) {
+    private String detectBrowser(String userAgent) {
+        String value = userAgent == null ? "Unknown browser" : userAgent.toLowerCase(Locale.ROOT);
+        if (value.contains("edg/")) return "Edge";
+        if (value.contains("chrome/") && !value.contains("edg/")) return "Chrome";
+        if (value.contains("firefox/")) return "Firefox";
+        if (value.contains("safari/") && !value.contains("chrome/")) return "Safari";
+        if (value.contains("curl")) return "CLI client";
+        return "Other client";
+    }
+
+    private String detectOperatingSystem(String userAgent) {
+        String value = userAgent == null ? "" : userAgent.toLowerCase(Locale.ROOT);
+        if (value.contains("android")) return "Android";
+        if (value.contains("iphone") || value.contains("ipad")) return "iOS";
+        if (value.contains("windows")) return "Windows";
+        if (value.contains("mac os")) return "macOS";
+        if (value.contains("linux")) return "Linux";
+        return "Other OS";
+    }
+
+    private String detectDeviceType(String userAgent) {
+        String value = userAgent == null ? "" : userAgent.toLowerCase(Locale.ROOT);
+        if (value.isBlank()) return "UNKNOWN";
+        return value.contains("mobile") || value.contains("android") || value.contains("iphone") ? "MOBILE" : "DESKTOP";
+    }
+
+    private LocalDateTime firstNonBlankDate(LocalDateTime value, LocalDateTime fallback) {
+        return value == null ? fallback : value;
+    }
+
+    private record RequestMetadata(String deviceName, String userAgent, String ipAddress, String deviceType, String browser, String operatingSystem) {
         static RequestMetadata empty() {
-            return new RequestMetadata(null, null, null, null);
+            return new RequestMetadata("Unknown device", null, null, "UNKNOWN", "Unknown browser", "Unknown OS");
         }
     }
 }

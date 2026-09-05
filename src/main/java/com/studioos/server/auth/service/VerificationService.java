@@ -8,6 +8,7 @@ import com.studioos.server.auth.dto.VerifyOtpRequest;
 import com.studioos.server.auth.otp.OtpService;
 import com.studioos.server.user.User;
 import com.studioos.server.user.UserRepository;
+import com.studioos.server.shared.enums.Role;
 
 import lombok.RequiredArgsConstructor;
 
@@ -39,6 +40,29 @@ public class VerificationService {
         otpService.verify(user.getEmail(), request.getCode());
 
         // Registration OTPs are email-keyed; do not claim phone verification too.
+        user.setEmailVerified(true);
+        user.setAccountVerified(true);
+        userRepository.save(user);
+        return issueSession(user);
+    }
+
+    @Transactional
+    public AuthResponse googleLogin(String subject, String email, String name) {
+        User user = userRepository.findByGoogleSubject(subject).orElseGet(() ->
+                userRepository.findByEmail(email).map(existing -> {
+                    if (existing.getGoogleSubject() != null && !subject.equals(existing.getGoogleSubject())) {
+                        throw com.studioos.server.shared.exceptions.StudioosException.conflict("This account is linked to another Google identity");
+                    }
+                    existing.setGoogleSubject(subject);
+                    return existing;
+                }).orElseGet(() -> User.builder()
+                        .email(email)
+                        .name(name == null || name.isBlank() ? email : name)
+                        .googleSubject(subject)
+                        .role(Role.USER)
+                        .emailVerified(true)
+                        .accountVerified(true)
+                        .build()));
         user.setEmailVerified(true);
         user.setAccountVerified(true);
         userRepository.save(user);

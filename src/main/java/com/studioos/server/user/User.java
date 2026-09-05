@@ -57,6 +57,9 @@ public class User implements UserDetails {
 
     private String passwordHash;
 
+    @Column(unique = true, length = 255)
+    private String googleSubject;
+
     @Column(nullable = false)
     @Builder.Default
     private boolean emailVerified = false;

@@ -49,4 +49,8 @@ public class RefreshSession {
     private String deviceName;
     private String userAgent;
     private String ipAddress;
+    private String deviceType;
+    private String browser;
+    private String operatingSystem;
+    private LocalDateTime lastActiveAt;
 }

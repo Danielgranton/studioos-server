@@ -18,6 +18,11 @@ public class SessionResponse {
     private String deviceName;
     private String userAgent;
     private String ipAddress;
+    private String deviceType;
+    private String browser;
+    private String operatingSystem;
+    private LocalDateTime lastActiveAt;
+    private boolean currentSession;
     private LocalDateTime createdAt;
     private LocalDateTime expiresAt;
     private LocalDateTime revokedAt;
