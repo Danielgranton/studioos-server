@@ -10,6 +10,7 @@ import com.studioos.server.auth.dto.OtpSentResponse;
 import com.studioos.server.auth.otp.OtpService;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.user.User;
+import com.studioos.server.user.AccountStatus;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,12 +37,19 @@ public class LoginService {
             throw exception;
         }
 
+        if (!user.isAccountVerified() || user.getStatus() != AccountStatus.ACTIVE) {
+            return genericResponse();
+        }
+
         String otp = otpService.generateAndSave(user.getEmail());
         communicationClient.send(communicationRequestFactory.otp(user.getEmail(), user.getPhone(), otp));
         log.info("Login OTP queued for user: {}", user.getEmail());
 
         // Keep the response shape identical for existing and unknown identifiers.
-        return genericResponse();
+        return OtpSentResponse.builder()
+                .message("If an account exists, a verification code has been sent")
+                .otpSent(true)
+                .build();
     }
 
     public OtpSentResponse resendOtp(LoginRequest request) {
@@ -51,6 +59,7 @@ public class LoginService {
     private OtpSentResponse genericResponse() {
         return OtpSentResponse.builder()
                 .message("If an account exists, a verification code has been sent")
+                .otpSent(false)
                 .build();
     }
 

@@ -24,6 +24,7 @@ import com.studioos.server.shared.audit.AccountAuditService;
 import com.studioos.server.shared.enums.AuditEventType;
 import com.studioos.server.user.User;
 import com.studioos.server.user.UserRepository;
+import com.studioos.server.user.AccountStatus;
 
 import lombok.RequiredArgsConstructor;
 
@@ -81,6 +82,10 @@ public class PasswordResetService {
 
         User user = userRepository.findById(token.getUserId())
                 .orElseThrow(() -> StudioosException.notFound("User not found"));
+
+        if (!user.isAccountVerified() || user.getStatus() != AccountStatus.ACTIVE) {
+            throw StudioosException.badRequest("Account must be verified before password login");
+        }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);

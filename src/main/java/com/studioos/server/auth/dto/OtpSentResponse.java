@@ -13,4 +13,5 @@ public class OtpSentResponse {
     private String message;
     private String maskedEmail;
     private String maskedPhone;
+    private boolean otpSent;
 }

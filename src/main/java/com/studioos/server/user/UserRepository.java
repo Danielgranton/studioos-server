@@ -2,6 +2,7 @@ package com.studioos.server.user;
 
 import java.util.Optional;
 import java.util.List;
+import java.time.LocalDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -18,4 +19,5 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     boolean existsByEmail(String email);
     boolean existsByPhone(String phone);
     boolean existsByUsername(String username);
+    List<User> findByStatusAndCreatedAtBefore(AccountStatus status, LocalDateTime cutoff);
 }

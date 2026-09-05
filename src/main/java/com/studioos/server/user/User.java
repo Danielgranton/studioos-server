@@ -72,6 +72,13 @@ public class User implements UserDetails {
     @Builder.Default
     private boolean accountVerified = false;
 
+    private LocalDateTime emailVerifiedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    @Builder.Default
+    private AccountStatus status = AccountStatus.PENDING;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
@@ -137,5 +144,7 @@ public class User implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
 
     @Override
-    public boolean isEnabled() { return accountVerified && deletedAt == null; }
+    public boolean isEnabled() {
+        return accountVerified && status == AccountStatus.ACTIVE && deletedAt == null;
+    }
 }

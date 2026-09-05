@@ -9,6 +9,8 @@ import com.studioos.server.auth.otp.OtpService;
 import com.studioos.server.user.User;
 import com.studioos.server.user.UserRepository;
 import com.studioos.server.shared.enums.Role;
+import com.studioos.server.user.AccountStatus;
+import java.time.LocalDateTime;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,6 +32,9 @@ public class VerificationService {
     @Transactional
     public AuthResponse verifyLogin(VerifyOtpRequest request) {
         User user = userLookupService.findByIdentifier(request.getIdentifier());
+        if (!user.isAccountVerified() || user.getStatus() != AccountStatus.ACTIVE) {
+            throw com.studioos.server.shared.exceptions.StudioosException.badRequest("Account is not verified yet");
+        }
         otpService.verify(user.getEmail(), request.getCode());
         return issueSession(user);
     }
@@ -41,7 +46,9 @@ public class VerificationService {
 
         // Registration OTPs are email-keyed; do not claim phone verification too.
         user.setEmailVerified(true);
+        user.setEmailVerifiedAt(LocalDateTime.now());
         user.setAccountVerified(true);
+        user.setStatus(AccountStatus.ACTIVE);
         userRepository.save(user);
         return issueSession(user);
     }

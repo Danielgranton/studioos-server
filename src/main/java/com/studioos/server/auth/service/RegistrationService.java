@@ -12,6 +12,7 @@ import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.user.User;
 import com.studioos.server.user.UserRepository;
+import com.studioos.server.user.AccountStatus;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,6 +58,7 @@ public class RegistrationService {
                 .message("Verification code sent to your email and phone")
                 .maskedEmail(maskEmail(request.getEmail()))
                 .maskedPhone(maskPhone(request.getPhone()))
+                .otpSent(true)
                 .build();
     }
 
@@ -97,10 +99,18 @@ public class RegistrationService {
         user.setName(request.getName());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
+        user.setEmailVerified(false);
+        user.setEmailVerifiedAt(null);
+        user.setAccountVerified(false);
+        user.setStatus(AccountStatus.PENDING);
         if (request.getRole() != null) user.setRole(request.getRole());
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPasswordHash(passwordService.hash(request.getPassword()));
         }
+        user.setEmailVerified(false);
+        user.setEmailVerifiedAt(null);
+        user.setAccountVerified(false);
+        user.setStatus(AccountStatus.PENDING);
         return user;
     }
 
