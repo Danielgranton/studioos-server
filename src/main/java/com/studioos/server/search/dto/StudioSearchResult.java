@@ -12,6 +12,7 @@ public class StudioSearchResult {
     private String studioName;
     private String location;
     private Integer pricing;
+    private String profileImageThumbnail;
     private Double averageRating;
     private Double score;
 }

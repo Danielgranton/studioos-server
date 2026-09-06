@@ -11,6 +11,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.studioos.server.advertisement.campaign.AdCampaignRepository;
 import com.studioos.server.booking.BookingRepository;
@@ -21,11 +22,13 @@ import com.studioos.server.search.event.StudioDeletedEvent;
 import com.studioos.server.search.event.StudioUpdatedEvent;
 import com.studioos.server.shared.media.ResponsiveImageAsset;
 import com.studioos.server.shared.media.ResponsiveImageProcessingService;
+import com.studioos.server.auth.service.ProfileImageServiceClient;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
 import com.studioos.server.shared.exceptions.StudioosException;
+import com.studioos.server.shared.storage.PresignedUrlService;
 import com.studioos.server.studio.dto.CreateStudioRequest;
 import com.studioos.server.studio.dto.RateStudioRequest;
 import com.studioos.server.studio.dto.StudioResponse;
@@ -49,6 +52,12 @@ public class StudioServiceImpl {
     private final com.studioos.server.payment.WithdrawalRepository withdrawalRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ResponsiveImageProcessingService responsiveImageProcessingService;
+    private final ProfileImageServiceClient profileImageServiceClient;
+    private final PresignedUrlService presignedUrlService;
+    private final StudioMediaService studioMediaService;
+
+    @org.springframework.beans.factory.annotation.Value("${storage.s3.profile-url-expiry-seconds:3600}")
+    private int profileUrlExpirySeconds;
 
     // ─── Create studio (PRODUCER only) ───
    @Transactional
@@ -64,6 +73,14 @@ public class StudioServiceImpl {
                     .pricing(request.getPricing())
                     .availability(request.getAvailability())
                     .description(request.getDescription())
+                    .badge(request.getBadge())
+                    .genres(request.getGenres() != null ? request.getGenres() : List.of())
+                    .equipment(request.getEquipment() != null ? request.getEquipment() : List.of())
+                    .rooms(request.getRooms())
+                    .yearsActive(request.getYearsActive())
+                    .responseTime(request.getResponseTime())
+                    .available(request.getAvailable() == null || request.getAvailable())
+                    .nextAvailable(request.getNextAvailable())
                     .ownerId(currentUser.getId())
                     .build();
 
@@ -99,6 +116,14 @@ public class StudioServiceImpl {
         if (request.getPricing() != null) studio.setPricing(request.getPricing());
         if (request.getAvailability() != null) studio.setAvailability(request.getAvailability());
         if (request.getDescription() != null) studio.setDescription(request.getDescription());
+        if (request.getBadge() != null) studio.setBadge(request.getBadge());
+        if (request.getGenres() != null) studio.setGenres(request.getGenres());
+        if (request.getEquipment() != null) studio.setEquipment(request.getEquipment());
+        if (request.getRooms() != null) studio.setRooms(request.getRooms());
+        if (request.getYearsActive() != null) studio.setYearsActive(request.getYearsActive());
+        if (request.getResponseTime() != null) studio.setResponseTime(request.getResponseTime());
+        if (request.getAvailable() != null) studio.setAvailable(request.getAvailable());
+        if (request.getNextAvailable() != null) studio.setNextAvailable(request.getNextAvailable());
         if (request.getProfileImage() != null) applyProfileImage(studio, request.getProfileImage());
 
         // ─── Replace services if provided ───
@@ -118,6 +143,44 @@ public class StudioServiceImpl {
         log.info("Studio updated: {}", studioId);
         applicationEventPublisher.publishEvent(new StudioUpdatedEvent(studio.getId()));
         return toResponse(studio);
+    }
+
+    // ─── Upload studio image ───
+    @Transactional
+    public StudioResponse updateStudioImage(User currentUser, String studioId, MultipartFile file) {
+        if (currentUser == null) {
+            throw StudioosException.unauthorized("Authentication required");
+        }
+        if (file == null || file.isEmpty()) {
+            throw StudioosException.badRequest("Studio image is required");
+        }
+        if (file.getSize() > 5L * 1024L * 1024L) {
+            throw StudioosException.badRequest("Studio image must not exceed 5 MB");
+        }
+
+        String contentType = file.getContentType();
+        if (!"image/jpeg".equals(contentType)
+                && !"image/png".equals(contentType)
+                && !"image/webp".equals(contentType)) {
+            throw StudioosException.badRequest("Only JPEG, PNG, and WebP images are supported");
+        }
+
+        Studio studio = findStudioAndVerifyOwner(studioId, currentUser);
+        try (var input = file.getInputStream()) {
+            ResponsiveImageAsset image = profileImageServiceClient.processUploadedProfileImage(
+                    input,
+                    file.getSize(),
+                    file.getOriginalFilename(),
+                    contentType,
+                    "studios/" + studio.getId() + "/profile",
+                    "studio-" + studio.getId());
+            applyImage(studio, image);
+            studioRepository.save(studio);
+            applicationEventPublisher.publishEvent(new StudioUpdatedEvent(studio.getId()));
+            return toResponse(studio);
+        } catch (java.io.IOException e) {
+            throw StudioosException.badRequest("Could not read studio image");
+        }
     }
 
     // ─── Delete studio ───
@@ -242,19 +305,52 @@ public class StudioServiceImpl {
                 .pricing(studio.getPricing())
                 .availability(studio.getAvailability())
                 .description(studio.getDescription())
-                .profileImage(studio.getProfileImage())
-                .profileImageLarge(studio.getProfileImageLarge())
-                .profileImageMedium(studio.getProfileImageMedium())
-                .profileImageThumbnail(studio.getProfileImageThumbnail())
+                .badge(studio.getBadge())
+                .genres(studio.getGenres())
+                .equipment(studio.getEquipment())
+                .rooms(studio.getRooms())
+                .yearsActive(studio.getYearsActive())
+                .responseTime(studio.getResponseTime())
+                .available(studio.isAvailable())
+                .nextAvailable(studio.getNextAvailable())
+                .bookings(studio.getBookings())
+                .verified(studio.isVerified())
+                .profileImage(resolveImageUrl(studio.getProfileImage()))
+                .profileImageLarge(resolveImageUrl(studio.getProfileImageLarge()))
+                .profileImageMedium(resolveImageUrl(studio.getProfileImageMedium()))
+                .profileImageThumbnail(resolveImageUrl(studio.getProfileImageThumbnail()))
                 .ownerId(studio.getOwnerId())
                 .ownerName(studio.getOwner() != null ? studio.getOwner().getName() : null)
+                .ownerProfileImageThumbnail(resolveOwnerThumbnail(studio.getOwner()))
                 .services(studio.getServices().stream()
                         .map(s -> s.getName())
                         .collect(Collectors.toList()))
+                .media(studioMediaService.getMedia(studio.getId()))
                 .averageRating(avgRating)
                 .totalRatings(totalRatings)
                 .createdAt(studio.getCreatedAt())
                 .build();
+    }
+
+    private String resolveOwnerThumbnail(User owner) {
+        if (owner == null || owner.getProfileImageThumbnail() == null) return null;
+
+        String reference = owner.getProfileImageThumbnail();
+        if (reference.endsWith("/128.webp")) {
+            reference = reference.substring(0, reference.length() - "/128.webp".length()) + "/64.webp";
+        }
+        return resolveImageUrl(reference);
+    }
+
+    private String resolveImageUrl(String reference) {
+        if (reference == null || !reference.startsWith("s3://")) return reference;
+        String remainder = reference.substring("s3://".length());
+        int separator = remainder.indexOf('/');
+        if (separator <= 0 || separator == remainder.length() - 1) return reference;
+        return presignedUrlService.generateDownloadUrl(
+                remainder.substring(0, separator),
+                remainder.substring(separator + 1),
+                profileUrlExpirySeconds);
     }
 
     private void applyProfileImage(Studio studio, String profileImageReference) {
@@ -265,6 +361,14 @@ public class StudioServiceImpl {
             return;
         }
 
+        studio.setProfileImage(image.getOriginalUrl());
+        studio.setProfileImageLarge(image.getLargeUrl());
+        studio.setProfileImageMedium(image.getMediumUrl());
+        studio.setProfileImageThumbnail(image.getThumbnailUrl());
+    }
+
+    private void applyImage(Studio studio, ResponsiveImageAsset image) {
+        if (image == null) return;
         studio.setProfileImage(image.getOriginalUrl());
         studio.setProfileImageLarge(image.getLargeUrl());
         studio.setProfileImageMedium(image.getMediumUrl());

@@ -15,5 +15,6 @@ public class SearchResultItem {
     private String id;
     private String title;
     private String subtitle;
+    private String image;
     private Double score;
 }

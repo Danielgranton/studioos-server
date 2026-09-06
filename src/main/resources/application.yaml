@@ -5,6 +5,11 @@ spring:
   application:
     name: studioos-server
 
+  servlet:
+    multipart:
+      max-file-size: ${MEDIA_MAX_FILE_SIZE:5MB}
+      max-request-size: ${MEDIA_MAX_REQUEST_SIZE:6MB}
+
   # ─── DATABASE ───
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:studioos}
@@ -118,7 +123,8 @@ media:
   service:
     host: ${MEDIA_SERVICE_HOST:127.0.0.1}
     port: ${MEDIA_SERVICE_PORT:50051}
-    rpc-timeout-ms: ${MEDIA_RPC_TIMEOUT_MS:30000}
+    # Responsive image processing includes several S3 uploads and can exceed 30 seconds.
+    rpc-timeout-ms: ${MEDIA_RPC_TIMEOUT_MS:120000}
     upload-timeout-ms: ${MEDIA_UPLOAD_TIMEOUT_MS:60000}
     retry:
       max-attempts: ${MEDIA_RETRY_MAX_ATTEMPTS:3}

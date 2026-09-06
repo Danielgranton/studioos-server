@@ -11,6 +11,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 @Entity
 @Table(name = "studios")
 @EntityListeners(AuditingEntityListener.class)
@@ -37,6 +40,32 @@ public class Studio {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
+
+    private String badge;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", nullable = false)
+    @Builder.Default
+    private List<String> genres = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", nullable = false)
+    @Builder.Default
+    private List<String> equipment = new ArrayList<>();
+
+    private Integer rooms;
+    private Integer yearsActive;
+    private String responseTime;
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean available = true;
+    private String nextAvailable;
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer bookings = 0;
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean verified = false;
 
     private String profileImage;
     private String profileImageLarge;

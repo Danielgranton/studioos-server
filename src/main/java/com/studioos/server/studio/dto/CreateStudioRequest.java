@@ -24,6 +24,15 @@ public class CreateStudioRequest {
     @NotBlank(message = "Description is required")
     private String description;
 
+    private String badge;
+    private List<String> genres;
+    private List<String> equipment;
+    private Integer rooms;
+    private Integer yearsActive;
+    private String responseTime;
+    private Boolean available;
+    private String nextAvailable;
+
     private String profileImage;
 
     private List<String> services;

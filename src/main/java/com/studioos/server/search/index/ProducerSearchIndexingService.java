@@ -21,7 +21,8 @@ public class ProducerSearchIndexingService {
 
     public void indexProducer(User producer) {
         try {
-            double avg = producerReviewRepository.findAverageRatingByProducerId(producer.getId());
+            Double averageRating = producerReviewRepository.findAverageRatingByProducerId(producer.getId());
+            double avg = averageRating != null ? averageRating : 0.0;
             int count = (int) producerReviewRepository.countByProducerId(producer.getId());
             ProducerDocument doc = ProducerMapper.toDocument(producer, avg, count);
             openSearchClient.index(i -> i.index(INDEX_NAME).id(String.valueOf(producer.getId())).document(doc));

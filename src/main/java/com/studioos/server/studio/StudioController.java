@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -19,6 +20,7 @@ import java.util.List;
 public class StudioController {
 
     private final StudioServiceImpl studioService;
+    private final StudioMediaService studioMediaService;
 
     // ─── Create studio ───
     @PostMapping
@@ -40,6 +42,59 @@ public class StudioController {
     ) {
         StudioResponse response = studioService.updateStudio(currentUser, studioId, request);
         return ResponseEntity.ok(ApiResponse.success("Studio updated successfully", response));
+    }
+
+    @PostMapping(value = "/{studioId}/image", consumes = "multipart/form-data")
+    public ResponseEntity<ApiResponse<StudioResponse>> updateStudioImage(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable String studioId,
+            @RequestPart("file") MultipartFile file
+    ) {
+        StudioResponse response = studioService.updateStudioImage(currentUser, studioId, file);
+        return ResponseEntity.ok(ApiResponse.success("Studio image updated successfully", response));
+    }
+
+    @PostMapping(value = "/{studioId}/media/images", consumes = "multipart/form-data")
+    public ResponseEntity<ApiResponse<StudioMediaResponse>> uploadGalleryImage(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable String studioId,
+            @RequestPart("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Studio gallery image uploaded successfully",
+                studioMediaService.uploadImage(currentUser, studioId, file)));
+    }
+
+    @PostMapping("/{studioId}/media/video/upload")
+    public ResponseEntity<ApiResponse<StudioVideoUploadResponse>> createVideoUpload(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable String studioId,
+            @RequestParam String contentType,
+            @RequestParam long contentLength
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                studioMediaService.createVideoUpload(currentUser, studioId, contentType, contentLength)));
+    }
+
+    @PostMapping("/{studioId}/media/video/{mediaId}/complete")
+    public ResponseEntity<ApiResponse<StudioMediaResponse>> completeVideoUpload(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable String studioId,
+            @PathVariable String mediaId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Studio video uploaded successfully",
+                studioMediaService.completeVideoUpload(currentUser, studioId, mediaId)));
+    }
+
+    @DeleteMapping("/{studioId}/media/{mediaId}")
+    public ResponseEntity<ApiResponse<Void>> deleteStudioMedia(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable String studioId,
+            @PathVariable String mediaId
+    ) {
+        studioMediaService.deleteMedia(currentUser, studioId, mediaId);
+        return ResponseEntity.ok(ApiResponse.success("Studio media deleted successfully"));
     }
 
     // ─── Delete studio ───

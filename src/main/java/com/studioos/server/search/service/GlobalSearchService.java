@@ -13,6 +13,7 @@ import com.studioos.server.search.dto.SearchResultItem;
 import com.studioos.server.search.dto.StudioSearchRequest;
 import com.studioos.server.search.dto.StudioSearchResult;
 import com.studioos.server.shared.enums.SearchEntityType;
+import com.studioos.server.shared.storage.PresignedUrlService;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -29,6 +30,10 @@ public class GlobalSearchService {
     private final ProducerSearchService producerSearchService;
     private final AdvertisementSearchService advertisementSearchService;
     private final SearchCacheService searchCacheService;
+    private final PresignedUrlService presignedUrlService;
+
+    @org.springframework.beans.factory.annotation.Value("${storage.s3.profile-url-expiry-seconds:3600}")
+    private int profileUrlExpirySeconds;
 
     public SearchResponseDto search(SearchRequest request) {
         String cacheKey = cacheKey(request);
@@ -73,6 +78,7 @@ public class GlobalSearchService {
                         .id(result.getId())
                         .title(result.getStudioName())
                         .subtitle(result.getLocation())
+                        .image(resolveImageUrl(result.getProfileImageThumbnail()))
                         .score(result.getScore())
                         .build());
             }
@@ -118,6 +124,17 @@ public class GlobalSearchService {
                 .build();
         searchCacheService.cacheSearchResult(cacheKey, response, Duration.ofMinutes(5));
         return response;
+    }
+
+    private String resolveImageUrl(String reference) {
+        if (reference == null || !reference.startsWith("s3://")) return reference;
+        String remainder = reference.substring("s3://".length());
+        int separator = remainder.indexOf('/');
+        if (separator <= 0 || separator == remainder.length() - 1) return reference;
+        return presignedUrlService.generateDownloadUrl(
+                remainder.substring(0, separator),
+                remainder.substring(separator + 1),
+                profileUrlExpirySeconds);
     }
 
     private String cacheKey(SearchRequest request) {

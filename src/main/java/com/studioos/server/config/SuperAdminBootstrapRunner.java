@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.studioos.server.auth.service.PasswordService;
 import com.studioos.server.shared.enums.Role;
+import com.studioos.server.user.AccountStatus;
 import com.studioos.server.user.User;
 import com.studioos.server.user.UserRepository;
 
@@ -60,6 +61,7 @@ public class SuperAdminBootstrapRunner implements ApplicationRunner {
                 .emailVerified(true)
                 .phoneVerified(phone.isBlank())
                 .accountVerified(true)
+                .status(AccountStatus.ACTIVE)
                 .build();
 
         userRepository.save(admin);
