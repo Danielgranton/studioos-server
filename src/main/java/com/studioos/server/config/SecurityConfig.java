@@ -76,6 +76,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/users/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/search/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/platform/stats").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/platform/featured-creators").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/ads/serve").permitAll()
                         .requestMatchers(HttpMethod.POST, "/ads/*/click").permitAll()

@@ -115,6 +115,16 @@ public class StudioController {
     }
 
     // ─── Get all studios (public, paginated) ───
+    @GetMapping("/featured")
+    public ResponseEntity<ApiResponse<PageResponse<StudioResponse>>> getFeaturedStudios(
+            @RequestParam(required = false) String filter,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        PageResponse<StudioResponse> response = studioService.getFeaturedStudios(filter, page, Math.min(size, 10));
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<StudioResponse>>> getAllStudios(
             @RequestParam(required = false) String location,

@@ -215,6 +215,32 @@ public class StudioServiceImpl {
         );
     }
 
+    public PageResponse<StudioResponse> getFeaturedStudios(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Studio> studios = studioRepository.findFeatured(pageable);
+
+        return PageResponse.from(studios.map(this::toResponse));
+    }
+
+    public PageResponse<StudioResponse> getFeaturedStudios(String filter, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        String normalizedFilter = filter == null ? "top-rated" : filter.trim().toLowerCase();
+        Page<Studio> studios = switch (normalizedFilter) {
+            case "available" -> studioRepository.findByAvailableTrue(pageable);
+            case "most-booked" -> studioRepository.findAll(
+                    PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "bookings")));
+            case "premium" -> studioRepository.findByPricingGreaterThanEqual(3000, pageable);
+            case "affordable" -> studioRepository.findByPricingLessThanEqual(2000, pageable);
+            case "recording" -> studioRepository.findByService("record", pageable);
+            case "mixing-mastering" -> studioRepository.findByService("mix", pageable);
+            case "podcast" -> studioRepository.findByService("podcast", pageable);
+            case "top-rated", "all" -> studioRepository.findFeatured(pageable);
+            default -> throw StudioosException.badRequest("Unsupported studio filter");
+        };
+
+        return PageResponse.from(studios.map(this::toResponse));
+    }
+
     // ─── Get my studios ───
     public List<StudioResponse> getMyStudios(User currentUser) {
         return studioRepository.findByOwnerId(currentUser.getId())

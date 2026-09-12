@@ -13,5 +13,8 @@ public interface ProducerReviewRepository extends JpaRepository<ProducerReview, 
     @Query("SELECT AVG(r.rating) FROM ProducerReview r WHERE r.producerId = :producerId")
     Double findAverageRatingByProducerId(Integer producerId);
 
+    @Query("SELECT AVG(r.rating) FROM ProducerReview r")
+    Double findAverageRating();
+
     long countByProducerId(Integer producerId);
 }
