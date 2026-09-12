@@ -1,6 +1,7 @@
 package com.studioos.server.platform;
 
 import com.studioos.server.beatmarketplace.BeatRepository;
+import com.studioos.server.advertisement.campaign.AdCampaignRepository;
 import com.studioos.server.shared.dto.ApiResponse;
 import com.studioos.server.shared.enums.BeatStatus;
 import com.studioos.server.shared.enums.BeatVisibility;
@@ -29,6 +30,7 @@ public class PlatformStatsController {
     private final StudioRepository studioRepository;
     private final BeatRepository beatRepository;
     private final UserRepository userRepository;
+    private final AdCampaignRepository adCampaignRepository;
     private final ProducerReviewRepository producerReviewRepository;
     private final PresignedUrlService presignedUrlService;
 
@@ -41,7 +43,9 @@ public class PlatformStatsController {
                 studioRepository.count(),
                 userRepository.countByRoleAndStatus(Role.PRODUCER, AccountStatus.ACTIVE),
                 beatRepository.countByStatusAndVisibility(BeatStatus.READY, BeatVisibility.PUBLIC),
-                userRepository.countByRoleAndStatus(Role.USER, AccountStatus.ACTIVE));
+                userRepository.countByRoleAndStatus(Role.ARTIST, AccountStatus.ACTIVE),
+                studioRepository.countServiceOfferings(),
+                adCampaignRepository.count());
 
         return ResponseEntity.ok(ApiResponse.success(stats));
     }

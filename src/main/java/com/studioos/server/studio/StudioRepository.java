@@ -18,6 +18,9 @@ public interface StudioRepository extends JpaRepository<Studio, String>, JpaSpec
 
     Page<Studio> findAll(Pageable pageable);
 
+    @Query("SELECT COUNT(s) FROM StudioService s")
+    long countServiceOfferings();
+
     @Query("SELECT s FROM Studio s LEFT JOIN s.ratings r GROUP BY s ORDER BY COALESCE(AVG(r.rating), 0) DESC, COUNT(r.id) DESC, s.createdAt DESC")
     Page<Studio> findFeatured(Pageable pageable);
 

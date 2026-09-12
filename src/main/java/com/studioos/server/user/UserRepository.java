@@ -7,6 +7,7 @@ import java.util.Collection;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -26,6 +27,10 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     @Query("SELECT COUNT(u) FROM User u WHERE u.role IN :roles AND u.status = :status AND u.accountVerified = true AND u.deletedAt IS NULL")
     long countFeaturedCreators(Collection<Role> roles, AccountStatus status);
+
+    @Query("SELECT u FROM User u WHERE u.role = com.studioos.server.shared.enums.Role.ARTIST AND u.status = :status AND u.accountVerified = true AND u.deletedAt IS NULL ORDER BY u.updatedAt DESC")
+    Page<User> findPublicArtists(AccountStatus status, Pageable pageable);
+
     boolean existsByEmail(String email);
     boolean existsByPhone(String phone);
     boolean existsByUsername(String username);

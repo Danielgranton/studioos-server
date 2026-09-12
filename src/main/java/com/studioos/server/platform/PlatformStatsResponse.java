@@ -4,6 +4,8 @@ public record PlatformStatsResponse(
         long studios,
         long producers,
         long beats,
-        long artists
+        long artists,
+        long services,
+        long campaigns
 ) {
 }

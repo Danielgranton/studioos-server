@@ -74,6 +74,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/beats/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/studios/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/users/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/artists/*/services").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/artists").permitAll()
                         .requestMatchers(HttpMethod.GET, "/search/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/platform/stats").permitAll()
                         .requestMatchers(HttpMethod.GET, "/platform/featured-creators").permitAll()
