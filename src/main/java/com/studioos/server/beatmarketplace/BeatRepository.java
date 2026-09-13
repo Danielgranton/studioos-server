@@ -11,6 +11,7 @@ import com.studioos.server.shared.enums.BeatVisibility;
 
 public interface BeatRepository extends JpaRepository<Beat, String>, JpaSpecificationExecutor<Beat> {
     List<Beat> findByProducerId(Integer producerId);
+    long countByProducerId(Integer producerId);
     List<Beat> findByStudioId(String studioId);
     boolean existsByStudioId(String studioId);
     List<Beat> findByStatusAndVisibility(BeatStatus status, BeatVisibility visibility);

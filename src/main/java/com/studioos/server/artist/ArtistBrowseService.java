@@ -6,8 +6,17 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Objects;
+
 import com.studioos.server.artist.dto.ArtistBrowseResponse;
+import com.studioos.server.engagement.EngagementAction;
+import com.studioos.server.engagement.EngagementEdgeRepository;
+import com.studioos.server.engagement.EngagementTargetType;
+import com.studioos.server.engagement.PopularityService;
 import com.studioos.server.shared.dto.PageResponse;
+import com.studioos.server.shared.enums.AvailabilityStatus;
+import com.studioos.server.shared.enums.VerificationStatus;
 import com.studioos.server.shared.storage.PresignedUrlService;
 import com.studioos.server.user.AccountStatus;
 import com.studioos.server.user.User;
@@ -21,6 +30,9 @@ public class ArtistBrowseService {
 
     private final UserRepository userRepository;
     private final ArtistServiceOfferingService offeringService;
+    private final ArtistReviewRepository reviewRepository;
+    private final EngagementEdgeRepository engagementRepository;
+    private final PopularityService popularityService;
     private final PresignedUrlService presignedUrlService;
 
     @Value("${storage.s3.profile-url-expiry-seconds:3600}")
@@ -37,6 +49,18 @@ public class ArtistBrowseService {
     }
 
     private ArtistBrowseResponse toResponse(User artist) {
+        var services = offeringService.getPublicServices(artist.getId());
+        Double averageRating = reviewRepository.findAverageRatingByArtistId(artist.getId());
+        var specialties = services.stream()
+                .map(service -> service.getName())
+                .filter(Objects::nonNull)
+                .distinct()
+                .limit(4)
+                .toList();
+        if (specialties.isEmpty() && artist.getGenre() != null && !artist.getGenre().isBlank()) {
+            specialties = List.of(artist.getGenre());
+        }
+
         return ArtistBrowseResponse.builder()
                 .id(artist.getId())
                 .name(artist.getName())
@@ -50,7 +74,19 @@ public class ArtistBrowseService {
                 .profileImageMedium(resolveImageUrl(artist.getProfileImageMedium()))
                 .profileImageThumbnail(resolveImageUrl(artist.getProfileImageThumbnail()))
                 .verified(artist.isAccountVerified())
-                .services(offeringService.getPublicServices(artist.getId()))
+                .verificationStatus(artist.getVerificationStatus())
+                .availabilityStatus(artist.isAvailable() ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.UNAVAILABLE)
+                .averageRating(averageRating != null ? averageRating : 0.0)
+                .reviewCount(reviewRepository.countByArtistId(artist.getId()))
+                .followerCount(engagementRepository.countByTargetTypeAndTargetIdAndAction(
+                        EngagementTargetType.USER, String.valueOf(artist.getId()), EngagementAction.FOLLOW))
+                .releasedProjectCount(0)
+                .popularityScore(popularityService.userScore(artist.getId()))
+                .trendingScore(popularityService.userTrendingScore(artist.getId()))
+                .featured(artist.isFeatured())
+                .available(artist.isAvailable() && services.stream().anyMatch(service -> service.isActive()))
+                .specialties(specialties)
+                .services(services)
                 .build();
     }
 

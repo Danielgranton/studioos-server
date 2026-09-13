@@ -1,6 +1,8 @@
 package com.studioos.server.artist.dto;
 
 import java.util.List;
+import com.studioos.server.shared.enums.AvailabilityStatus;
+import com.studioos.server.shared.enums.VerificationStatus;
 
 import lombok.Builder;
 import lombok.Value;
@@ -20,5 +22,16 @@ public class ArtistBrowseResponse {
     String profileImageMedium;
     String profileImageThumbnail;
     boolean verified;
+    VerificationStatus verificationStatus;
+    AvailabilityStatus availabilityStatus;
+    double averageRating;
+    long reviewCount;
+    long followerCount;
+    long releasedProjectCount;
+    double popularityScore;
+    double trendingScore;
+    boolean featured;
+    boolean available;
+    List<String> specialties;
     List<ArtistServiceOfferingResponse> services;
 }

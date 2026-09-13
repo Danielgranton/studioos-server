@@ -7,6 +7,7 @@ import com.studioos.server.auth.dto.AuthResponse;
 import com.studioos.server.auth.dto.VerifyOtpRequest;
 import com.studioos.server.auth.otp.OtpService;
 import com.studioos.server.user.User;
+import com.studioos.server.shared.enums.VerificationStatus;
 import com.studioos.server.user.UserRepository;
 import com.studioos.server.shared.enums.Role;
 import com.studioos.server.user.AccountStatus;
@@ -48,6 +49,7 @@ public class VerificationService {
         user.setEmailVerified(true);
         user.setEmailVerifiedAt(LocalDateTime.now());
         user.setAccountVerified(true);
+        user.setVerificationStatus(VerificationStatus.VERIFIED);
         user.setStatus(AccountStatus.ACTIVE);
         userRepository.save(user);
         return issueSession(user);
@@ -72,6 +74,7 @@ public class VerificationService {
                         .build()));
         user.setEmailVerified(true);
         user.setAccountVerified(true);
+        user.setVerificationStatus(VerificationStatus.VERIFIED);
         userRepository.save(user);
         return issueSession(user);
     }

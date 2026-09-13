@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.studioos.server.artist.dto.ArtistServiceOfferingRequest;
 import com.studioos.server.artist.dto.ArtistServiceOfferingResponse;
 import com.studioos.server.artist.dto.ArtistBrowseResponse;
+import com.studioos.server.artist.dto.ArtistReviewResponse;
+import com.studioos.server.artist.dto.RateArtistRequest;
 import com.studioos.server.shared.dto.ApiResponse;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.user.User;
@@ -32,6 +34,22 @@ public class ArtistServiceOfferingController {
 
     private final ArtistServiceOfferingService offeringService;
     private final ArtistBrowseService browseService;
+    private final ArtistReviewService reviewService;
+
+    @PostMapping("/{artistId}/reviews")
+    public ResponseEntity<ApiResponse<ArtistReviewResponse>> submitReview(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable Integer artistId,
+            @Valid @RequestBody RateArtistRequest request
+    ) {
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(ApiResponse.success(reviewService.submitReview(currentUser, artistId, request)));
+    }
+
+    @GetMapping("/{artistId}/reviews")
+    public ResponseEntity<ApiResponse<List<ArtistReviewResponse>>> getReviews(@PathVariable Integer artistId) {
+        return ResponseEntity.ok(ApiResponse.success(reviewService.getReviews(artistId)));
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<ArtistBrowseResponse>>> getArtists(

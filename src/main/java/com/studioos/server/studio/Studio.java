@@ -13,6 +13,7 @@ import java.util.List;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import com.studioos.server.shared.enums.VerificationStatus;
 
 @Entity
 @Table(name = "studios")
@@ -59,6 +60,9 @@ public class Studio {
     @Column(nullable = false)
     @Builder.Default
     private boolean available = true;
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean featured = false;
     private String nextAvailable;
     @Column(nullable = false)
     @Builder.Default
@@ -66,6 +70,15 @@ public class Studio {
     @Column(nullable = false)
     @Builder.Default
     private boolean verified = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    @Builder.Default
+    private VerificationStatus verificationStatus = VerificationStatus.UNVERIFIED;
+
+    private String verificationReason;
+    private LocalDateTime verificationReviewedAt;
+    private Integer verificationReviewedBy;
 
     private String profileImage;
     private String profileImageLarge;

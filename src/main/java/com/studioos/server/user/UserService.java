@@ -8,9 +8,15 @@ import org.springframework.beans.factory.annotation.Value;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.shared.audit.AccountAuditService;
 import com.studioos.server.shared.enums.AuditEventType;
+import com.studioos.server.shared.enums.AvailabilityStatus;
+import com.studioos.server.shared.enums.VerificationStatus;
 import com.studioos.server.shared.media.ResponsiveImageAsset;
 import com.studioos.server.shared.storage.PresignedUrlService;
 import com.studioos.server.auth.service.ProfileImageServiceClient;
+import com.studioos.server.search.index.ProducerSearchIndexingService;
+import com.studioos.server.search.index.StudioSearchIndexingService;
+import com.studioos.server.studio.Studio;
+import com.studioos.server.studio.StudioRepository;
 import com.studioos.server.shared.media.ResponsiveImageProcessingService;
 import com.studioos.server.user.dto.PublicUserResponse;
 import com.studioos.server.user.dto.UpdateProfileRequest;
@@ -31,6 +37,9 @@ public class UserService {
     private final PresignedUrlService presignedUrlService;
     private final AccountAuditService accountAuditService;
     private final PrivacySettingsService privacySettingsService;
+    private final ProducerSearchIndexingService producerSearchIndexingService;
+    private final StudioRepository studioRepository;
+    private final StudioSearchIndexingService studioSearchIndexingService;
 
     @Value("${storage.s3.profile-url-expiry-seconds:3600}")
     private int profileUrlExpirySeconds;
@@ -45,20 +54,49 @@ public class UserService {
     public UserProfileResponse updateProfile(User currentUser, UpdateProfileRequest request) {
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> StudioosException.notFound("User not found"));
+        String previousLocation = user.getLocation();
+        boolean previousAvailability = user.isAvailable();
 
         if (request.getBio() != null) user.setBio(request.getBio());
         if (request.getLocation() != null) user.setLocation(request.getLocation());
         if (request.getGenre() != null) user.setGenre(request.getGenre());
         if (request.getExperience() != null) user.setExperience(request.getExperience());
+        if (request.getAvailable() != null) user.setAvailable(request.getAvailable());
         if (request.getProfileImage() != null) applyProfileImage(user, request.getProfileImage());
         if (request.getInstagram() != null) user.setInstagram(request.getInstagram());
         if (request.getYoutube() != null) user.setYoutube(request.getYoutube());
         if (request.getLink() != null) user.setLink(request.getLink());
 
         userRepository.save(user);
+        boolean locationChanged = request.getLocation() != null && !request.getLocation().equals(previousLocation);
+        boolean availabilityChanged = request.getAvailable() != null && request.getAvailable() != previousAvailability;
+        if (user.getRole() == com.studioos.server.shared.enums.Role.PRODUCER && (locationChanged || availabilityChanged)) {
+            syncOwnedStudioLocations(user, locationChanged);
+        }
+        if (user.getRole() == com.studioos.server.shared.enums.Role.PRODUCER) {
+            try {
+                producerSearchIndexingService.indexProducer(user);
+            } catch (RuntimeException exception) {
+                log.warn("Producer availability update saved but search indexing failed for {}", user.getId(), exception);
+            }
+        }
         accountAuditService.record(AuditEventType.PROFILE_UPDATED, user, "Profile details updated");
         log.info("Profile updated for user: {}", user.getEmail());
         return toProfileResponse(user);
+    }
+
+    private void syncOwnedStudioLocations(User producer, boolean updateLocation) {
+        for (Studio studio : studioRepository.findByOwnerId(producer.getId())) {
+            if (updateLocation) {
+                studio.setLocation(producer.getLocation());
+                studioRepository.save(studio);
+            }
+            try {
+                studioSearchIndexingService.indexStudio(studio);
+            } catch (RuntimeException exception) {
+                log.warn("Studio location updated but search indexing failed for {}", studio.getId(), exception);
+            }
+        }
     }
 
     @Transactional
@@ -140,10 +178,13 @@ public class UserService {
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .role(user.getRole())
+                .verificationStatus(user.getVerificationStatus())
+                .availabilityStatus(toAvailabilityStatus(user.isAvailable()))
                 .bio(user.getBio())
                 .location(user.getLocation())
                 .genre(user.getGenre())
                 .experience(user.getExperience())
+                .available(user.isAvailable())
                 .profileImage(resolveImageUrl(user.getProfileImage()))
                 .profileImageLarge(resolveImageUrl(user.getProfileImageLarge()))
                 .profileImageMedium(resolveImageUrl(user.getProfileImageMedium()))
@@ -164,6 +205,8 @@ public class UserService {
                 .email(privacy.isEmailVisible() ? user.getEmail() : null)
                 .phone(privacy.isPhoneVisible() ? user.getPhone() : null)
                 .role(user.getRole())
+                .verificationStatus(user.getVerificationStatus())
+                .availabilityStatus(toAvailabilityStatus(user.isAvailable()))
                 .bio(user.getBio())
                 .location(user.getLocation())
                 .genre(user.getGenre())
@@ -206,5 +249,9 @@ public class UserService {
                 remainder.substring(0, separator),
                 remainder.substring(separator + 1),
                 profileUrlExpirySeconds);
+    }
+
+    private AvailabilityStatus toAvailabilityStatus(boolean available) {
+        return available ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.UNAVAILABLE;
     }
 }

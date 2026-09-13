@@ -31,4 +31,7 @@ public class StudioDocument {
     private Integer ownerId;
     private Double averageRating;
     private Integer ratingCount;
+    private Double popularityScore;
+    private Double trendingScore;
+    private Boolean featured;
 }

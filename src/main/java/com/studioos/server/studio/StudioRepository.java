@@ -9,12 +9,14 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import com.studioos.server.shared.enums.VerificationStatus;
 
 @Repository
 public interface StudioRepository extends JpaRepository<Studio, String>, JpaSpecificationExecutor<Studio> {
 
     @EntityGraph(attributePaths = "services")
     List<Studio> findByOwnerId(Integer ownerId);
+    List<Studio> findByVerificationStatus(VerificationStatus verificationStatus);
 
     Page<Studio> findAll(Pageable pageable);
 
@@ -24,7 +26,8 @@ public interface StudioRepository extends JpaRepository<Studio, String>, JpaSpec
     @Query("SELECT s FROM Studio s LEFT JOIN s.ratings r GROUP BY s ORDER BY COALESCE(AVG(r.rating), 0) DESC, COUNT(r.id) DESC, s.createdAt DESC")
     Page<Studio> findFeatured(Pageable pageable);
 
-    Page<Studio> findByAvailableTrue(Pageable pageable);
+    @Query("SELECT s FROM Studio s JOIN s.owner owner WHERE owner.available = true")
+    Page<Studio> findByOwnerAvailableTrue(Pageable pageable);
 
     Page<Studio> findByPricingGreaterThanEqual(Integer minimumPrice, Pageable pageable);
 

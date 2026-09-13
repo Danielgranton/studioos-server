@@ -27,5 +27,10 @@ public class ProducerDocument {
     private List<String> services;
     private Double averageRating;
     private Integer reviewCount;
+    private Long followerCount;
+    private Long beatCount;
+    private Double popularityScore;
+    private Double trendingScore;
+    private Boolean featured;
     private String createdAt;
 }

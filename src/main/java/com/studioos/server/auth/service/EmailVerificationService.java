@@ -10,6 +10,7 @@ import com.studioos.server.auth.otp.OtpService;
 import com.studioos.server.auth.dto.VerifyOtpRequest;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.user.User;
+import com.studioos.server.shared.enums.VerificationStatus;
 import com.studioos.server.user.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,7 @@ public class EmailVerificationService {
         otpService.verify(user.getEmail(), request.getCode());
         user.setEmailVerified(true);
         user.setAccountVerified(true);
+        user.setVerificationStatus(VerificationStatus.VERIFIED);
         userRepository.save(user);
     }
 

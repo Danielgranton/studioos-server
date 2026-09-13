@@ -20,6 +20,11 @@ public final class ProducerMapper {
                 .verified(producer.isAccountVerified())
                 .averageRating(averageRating)
                 .reviewCount(reviewCount)
+                .followerCount(0L)
+                .beatCount(0L)
+                .popularityScore(0.0)
+                .trendingScore(0.0)
+                .featured(false)
                 .createdAt(producer.getCreatedAt() != null ? producer.getCreatedAt().toString() : null)
                 .build();
     }
@@ -42,6 +47,11 @@ public final class ProducerMapper {
                 .services(doc.getServices())
                 .averageRating(doc.getAverageRating())
                 .reviewCount(doc.getReviewCount())
+                .followerCount(doc.getFollowerCount())
+                .beatCount(doc.getBeatCount())
+                .popularityScore(doc.getPopularityScore())
+                .trendingScore(doc.getTrendingScore())
+                .featured(doc.getFeatured())
                 .score(score)
                 .build();
     }

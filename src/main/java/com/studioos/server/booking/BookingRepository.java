@@ -42,4 +42,11 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     List<Booking> findByStudioIdIn(List<String> studioIds);
     List<Booking> findByStudioIdInAndStatus(List<String> studioIds, BookingStatus status);
     List<Booking> findByStudioIdInAndPaymentStatus(List<String> studioIds, BookingPaymentStatus paymentStatus);
+
+    long countByArtistIdAndStatusAndPaymentStatus(Integer artistId, BookingStatus status, BookingPaymentStatus paymentStatus);
+
+    @Query("SELECT COUNT(b) FROM Booking b JOIN b.studio s WHERE s.ownerId = :producerId AND b.status = :status AND b.paymentStatus = :paymentStatus")
+    long countByProducerIdAndStatusAndPaymentStatus(Integer producerId, BookingStatus status, BookingPaymentStatus paymentStatus);
+
+    long countByStudioIdAndStatusAndPaymentStatus(String studioId, BookingStatus status, BookingPaymentStatus paymentStatus);
 }

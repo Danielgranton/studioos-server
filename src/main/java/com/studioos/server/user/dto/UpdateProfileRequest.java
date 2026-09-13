@@ -8,6 +8,7 @@ public class UpdateProfileRequest {
     private String location;
     private String genre;
     private String experience;
+    private Boolean available;
     private String profileImage;
     private String instagram;
     private String youtube;

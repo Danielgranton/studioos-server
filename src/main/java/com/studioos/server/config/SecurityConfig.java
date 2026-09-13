@@ -75,10 +75,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/studios/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/users/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/artists/*/services").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/artists/*/reviews").permitAll()
                         .requestMatchers(HttpMethod.GET, "/artists").permitAll()
                         .requestMatchers(HttpMethod.GET, "/search/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/platform/stats").permitAll()
                         .requestMatchers(HttpMethod.GET, "/platform/featured-creators").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/engagement/views").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/ads/serve").permitAll()
                         .requestMatchers(HttpMethod.POST, "/ads/*/click").permitAll()
@@ -101,6 +103,12 @@ public class SecurityConfig {
                         // ───────────── ADMIN ─────────────
 
                         .requestMatchers("/admin/search/reindex")
+                        .hasAnyRole(Role.ADMIN.name(), Role.SUPER_ADMIN.name())
+
+                        .requestMatchers("/admin/verification/**")
+                        .hasAnyRole(Role.ADMIN.name(), Role.SUPER_ADMIN.name())
+
+                        .requestMatchers("/admin/discovery/**")
                         .hasAnyRole(Role.ADMIN.name(), Role.SUPER_ADMIN.name())
 
                         .requestMatchers("/admin/users/**")

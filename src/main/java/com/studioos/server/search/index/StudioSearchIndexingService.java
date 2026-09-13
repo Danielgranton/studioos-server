@@ -2,6 +2,7 @@ package com.studioos.server.search.index;
 
 import com.studioos.server.search.document.StudioDocument;
 import com.studioos.server.studio.Studio;
+import com.studioos.server.engagement.PopularityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.opensearch.client.opensearch.OpenSearchClient;
@@ -15,6 +16,7 @@ public class StudioSearchIndexingService {
     private static final String INDEX_NAME = "studios";
 
     private final OpenSearchClient openSearchClient;
+    private final PopularityService popularityService;
 
     public void indexStudio(Studio studio) {
         try {
@@ -28,7 +30,9 @@ public class StudioSearchIndexingService {
             StudioDocument doc = StudioDocument.builder()
                     .id(studio.getId())
                     .studioName(studio.getStudioName())
-                    .location(studio.getLocation())
+                    .location(studio.getOwner() != null && studio.getOwner().getLocation() != null
+                            ? studio.getOwner().getLocation()
+                            : studio.getLocation())
                     .description(studio.getDescription())
                     .badge(studio.getBadge())
                     .genres(studio.getGenres())
@@ -36,7 +40,9 @@ public class StudioSearchIndexingService {
                     .rooms(studio.getRooms())
                     .yearsActive(studio.getYearsActive())
                     .responseTime(studio.getResponseTime())
-                    .available(studio.isAvailable())
+                    .available(studio.getOwner() == null
+                            ? studio.isAvailable()
+                            : studio.getOwner().isAvailable())
                     .nextAvailable(studio.getNextAvailable())
                     .bookings(studio.getBookings())
                     .verified(studio.isVerified())
@@ -45,6 +51,9 @@ public class StudioSearchIndexingService {
                     .ownerId(studio.getOwnerId())
                     .averageRating(avgRating)
                     .ratingCount(studio.getRatings() != null ? studio.getRatings().size() : 0)
+                    .popularityScore(popularityService.studioScore(studio.getId()))
+                    .trendingScore(popularityService.studioTrendingScore(studio.getId()))
+                    .featured(studio.isFeatured())
                     .build();
 
             openSearchClient.index(i -> i.index(INDEX_NAME).id(studio.getId()).document(doc));

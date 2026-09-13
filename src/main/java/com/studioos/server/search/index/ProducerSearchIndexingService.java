@@ -1,6 +1,11 @@
 package com.studioos.server.search.index;
 
 import com.studioos.server.reviews.ProducerReviewRepository;
+import com.studioos.server.beatmarketplace.BeatRepository;
+import com.studioos.server.engagement.EngagementAction;
+import com.studioos.server.engagement.EngagementEdgeRepository;
+import com.studioos.server.engagement.EngagementTargetType;
+import com.studioos.server.engagement.PopularityService;
 import com.studioos.server.search.document.ProducerDocument;
 import com.studioos.server.search.mapper.ProducerMapper;
 import com.studioos.server.user.User;
@@ -24,13 +29,19 @@ public class ProducerSearchIndexingService {
 
     private final OpenSearchClient openSearchClient;
     private final ProducerReviewRepository producerReviewRepository;
+    private final BeatRepository beatRepository;
     private final StudioRepository studioRepository;
+    private final EngagementEdgeRepository engagementEdgeRepository;
+    private final PopularityService popularityService;
 
     public void indexProducer(User producer) {
         try {
             Double averageRating = producerReviewRepository.findAverageRatingByProducerId(producer.getId());
             double avg = averageRating != null ? averageRating : 0.0;
             int count = (int) producerReviewRepository.countByProducerId(producer.getId());
+            long followerCount = engagementEdgeRepository.countByTargetTypeAndTargetIdAndAction(
+                    EngagementTargetType.USER, String.valueOf(producer.getId()), EngagementAction.FOLLOW);
+            long beatCount = beatRepository.countByProducerId(producer.getId());
             List<Studio> studios = studioRepository.findByOwnerId(producer.getId());
             List<String> studioNames = studios.stream()
                     .map(Studio::getStudioName)
@@ -53,7 +64,7 @@ public class ProducerSearchIndexingService {
                     .filter(value -> value != null && !value.isBlank())
                     .findFirst()
                     .orElse(null);
-            boolean available = studios.stream().anyMatch(Studio::isAvailable);
+            boolean available = producer.isAvailable();
 
             ProducerDocument doc = ProducerMapper.toDocument(producer, avg, count);
             doc.setProfileImageThumbnail(producer.getProfileImageThumbnail());
@@ -64,6 +75,11 @@ public class ProducerSearchIndexingService {
             doc.setStartingPrice(startingPrice);
             doc.setResponseTime(responseTime);
             doc.setServices(services);
+            doc.setFollowerCount(followerCount);
+            doc.setBeatCount(beatCount);
+            doc.setPopularityScore(popularityService.userScore(producer.getId()));
+            doc.setTrendingScore(popularityService.userTrendingScore(producer.getId()));
+            doc.setFeatured(producer.isFeatured());
             openSearchClient.index(i -> i.index(INDEX_NAME).id(String.valueOf(producer.getId())).document(doc));
         } catch (Exception e) {
             log.error("Failed to index producer {} in OpenSearch: {}", producer.getId(), e.getMessage());

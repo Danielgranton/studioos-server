@@ -15,6 +15,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.studioos.server.shared.enums.Role;
+import com.studioos.server.shared.enums.VerificationStatus;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -72,6 +73,15 @@ public class User implements UserDetails {
     @Builder.Default
     private boolean accountVerified = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    @Builder.Default
+    private VerificationStatus verificationStatus = VerificationStatus.UNVERIFIED;
+
+    private String verificationReason;
+    private LocalDateTime verificationReviewedAt;
+    private Integer verificationReviewedBy;
+
     private LocalDateTime emailVerifiedAt;
 
     @Enumerated(EnumType.STRING)
@@ -100,6 +110,14 @@ public class User implements UserDetails {
     private String profileImageMedium;
     private String profileImageThumbnail;
     private String experience;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean available = true;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean featured = false;
 
     // ─── Social links ───
     private String instagram;

@@ -10,6 +10,7 @@ import com.studioos.server.communication.CommunicationClient;
 import com.studioos.server.communication.CommunicationRequestFactory;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.user.User;
+import com.studioos.server.shared.enums.VerificationStatus;
 import com.studioos.server.user.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -51,6 +52,7 @@ public class PhoneVerificationService {
         otpService.verify(user.getPhone(), request.getCode());
         user.setPhoneVerified(true);
         user.setAccountVerified(user.isEmailVerified());
+        if (user.isAccountVerified()) user.setVerificationStatus(VerificationStatus.VERIFIED);
         userRepository.save(user);
     }
 

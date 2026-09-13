@@ -2,6 +2,8 @@ package com.studioos.server.studio.dto;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.studioos.server.shared.enums.AvailabilityStatus;
+import com.studioos.server.shared.enums.VerificationStatus;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,6 +31,8 @@ public class StudioResponse {
     private String nextAvailable;
     private Integer bookings;
     private boolean verified;
+    private VerificationStatus verificationStatus;
+    private AvailabilityStatus availabilityStatus;
     private String profileImage;
     private String profileImageLarge;
     private String profileImageMedium;
@@ -40,5 +44,8 @@ public class StudioResponse {
     private List<StudioMediaResponse> media;
     private Double averageRating;
     private Long totalRatings;
+    private Double popularityScore;
+    private Double trendingScore;
+    private boolean featured;
     private LocalDateTime createdAt;
 }

@@ -1,6 +1,8 @@
 package com.studioos.server.user.dto;
 
 import com.studioos.server.shared.enums.Role;
+import com.studioos.server.shared.enums.AvailabilityStatus;
+import com.studioos.server.shared.enums.VerificationStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,10 +21,13 @@ public class UserProfileResponse {
     private String email;
     private String phone;
     private Role role;
+    private VerificationStatus verificationStatus;
+    private AvailabilityStatus availabilityStatus;
     private String bio;
     private String location;
     private String genre;
     private String experience;
+    private boolean available;
     private String profileImage;
     private String profileImageLarge;
     private String profileImageMedium;

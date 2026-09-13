@@ -50,6 +50,7 @@ public class AccountDeletionService {
         user.setEmailVerified(false);
         user.setPhoneVerified(false);
         user.setAccountVerified(false);
+        user.setVerificationStatus(com.studioos.server.shared.enums.VerificationStatus.UNVERIFIED);
         user.setProfileImage(null);
         user.setProfileImageLarge(null);
         user.setProfileImageMedium(null);

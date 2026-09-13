@@ -99,6 +99,11 @@ final class SearchIndexMappings {
                         .properties("services", p -> p.keyword(k -> k))
                         .properties("averageRating", p -> p.double_(d -> d))
                         .properties("reviewCount", p -> p.integer(i -> i))
+                        .properties("followerCount", p -> p.long_(l -> l))
+                        .properties("beatCount", p -> p.long_(l -> l))
+                        .properties("popularityScore", p -> p.double_(d -> d))
+                        .properties("trendingScore", p -> p.double_(d -> d))
+                        .properties("featured", p -> p.boolean_(b -> b))
                         .properties("createdAt", p -> p.date(d -> d))
                 ));
     }

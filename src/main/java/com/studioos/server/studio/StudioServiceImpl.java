@@ -27,6 +27,8 @@ import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
+import com.studioos.server.shared.enums.AvailabilityStatus;
+import com.studioos.server.engagement.PopularityService;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.shared.storage.PresignedUrlService;
 import com.studioos.server.studio.dto.CreateStudioRequest;
@@ -55,6 +57,7 @@ public class StudioServiceImpl {
     private final ProfileImageServiceClient profileImageServiceClient;
     private final PresignedUrlService presignedUrlService;
     private final StudioMediaService studioMediaService;
+    private final PopularityService popularityService;
 
     @org.springframework.beans.factory.annotation.Value("${storage.s3.profile-url-expiry-seconds:3600}")
     private int profileUrlExpirySeconds;
@@ -69,7 +72,9 @@ public class StudioServiceImpl {
             // ─── Save studio first to get the generated ID ───
             Studio studio = Studio.builder()
                     .studioName(request.getStudioName())
-                    .location(request.getLocation())
+                    .location(currentUser.getLocation() != null && !currentUser.getLocation().isBlank()
+                            ? currentUser.getLocation()
+                            : request.getLocation())
                     .pricing(request.getPricing())
                     .availability(request.getAvailability())
                     .description(request.getDescription())
@@ -112,7 +117,9 @@ public class StudioServiceImpl {
         Studio studio = findStudioAndVerifyOwner(studioId, currentUser);
 
         if (request.getStudioName() != null) studio.setStudioName(request.getStudioName());
-        if (request.getLocation() != null) studio.setLocation(request.getLocation());
+        if (studio.getOwner() != null && studio.getOwner().getLocation() != null) {
+            studio.setLocation(studio.getOwner().getLocation());
+        }
         if (request.getPricing() != null) studio.setPricing(request.getPricing());
         if (request.getAvailability() != null) studio.setAvailability(request.getAvailability());
         if (request.getDescription() != null) studio.setDescription(request.getDescription());
@@ -226,7 +233,7 @@ public class StudioServiceImpl {
         Pageable pageable = PageRequest.of(page, size);
         String normalizedFilter = filter == null ? "top-rated" : filter.trim().toLowerCase();
         Page<Studio> studios = switch (normalizedFilter) {
-            case "available" -> studioRepository.findByAvailableTrue(pageable);
+            case "available" -> studioRepository.findByOwnerAvailableTrue(pageable);
             case "most-booked" -> studioRepository.findAll(
                     PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "bookings")));
             case "premium" -> studioRepository.findByPricingGreaterThanEqual(3000, pageable);
@@ -327,7 +334,9 @@ public class StudioServiceImpl {
         return StudioResponse.builder()
                 .id(studio.getId())
                 .studioName(studio.getStudioName())
-                .location(studio.getLocation())
+                .location(studio.getOwner() != null && studio.getOwner().getLocation() != null
+                        ? studio.getOwner().getLocation()
+                        : studio.getLocation())
                 .pricing(studio.getPricing())
                 .availability(studio.getAvailability())
                 .description(studio.getDescription())
@@ -337,10 +346,14 @@ public class StudioServiceImpl {
                 .rooms(studio.getRooms())
                 .yearsActive(studio.getYearsActive())
                 .responseTime(studio.getResponseTime())
-                .available(studio.isAvailable())
+                .available(studio.getOwner() == null || studio.getOwner().isAvailable())
                 .nextAvailable(studio.getNextAvailable())
                 .bookings(studio.getBookings())
                 .verified(studio.isVerified())
+                .verificationStatus(studio.getVerificationStatus())
+                .availabilityStatus(studio.getOwner() != null
+                        ? (studio.getOwner().isAvailable() ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.UNAVAILABLE)
+                        : (studio.isAvailable() ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.UNAVAILABLE))
                 .profileImage(resolveImageUrl(studio.getProfileImage()))
                 .profileImageLarge(resolveImageUrl(studio.getProfileImageLarge()))
                 .profileImageMedium(resolveImageUrl(studio.getProfileImageMedium()))
@@ -354,6 +367,9 @@ public class StudioServiceImpl {
                 .media(studioMediaService.getMedia(studio.getId()))
                 .averageRating(avgRating)
                 .totalRatings(totalRatings)
+                .popularityScore(popularityService.studioScore(studio.getId()))
+                .trendingScore(popularityService.studioTrendingScore(studio.getId()))
+                .featured(studio.isFeatured())
                 .createdAt(studio.getCreatedAt())
                 .build();
     }
