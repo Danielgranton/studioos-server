@@ -17,6 +17,7 @@ import com.studioos.server.engagement.PopularityService;
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.shared.enums.AvailabilityStatus;
 import com.studioos.server.shared.enums.VerificationStatus;
+import com.studioos.server.reviews.ReviewModerationStatus;
 import com.studioos.server.shared.storage.PresignedUrlService;
 import com.studioos.server.user.AccountStatus;
 import com.studioos.server.user.User;
@@ -77,7 +78,7 @@ public class ArtistBrowseService {
                 .verificationStatus(artist.getVerificationStatus())
                 .availabilityStatus(artist.isAvailable() ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.UNAVAILABLE)
                 .averageRating(averageRating != null ? averageRating : 0.0)
-                .reviewCount(reviewRepository.countByArtistId(artist.getId()))
+                .reviewCount(reviewRepository.countByArtistIdAndModerationStatus(artist.getId(), ReviewModerationStatus.ACTIVE))
                 .followerCount(engagementRepository.countByTargetTypeAndTargetIdAndAction(
                         EngagementTargetType.USER, String.valueOf(artist.getId()), EngagementAction.FOLLOW))
                 .releasedProjectCount(0)

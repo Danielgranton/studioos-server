@@ -8,6 +8,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +25,7 @@ public class StudioController {
 
     private final StudioServiceImpl studioService;
     private final StudioMediaService studioMediaService;
+    private final StudioReviewService studioReviewService;
 
     // ─── Create studio ───
     @PostMapping
@@ -112,6 +117,14 @@ public class StudioController {
     public ResponseEntity<ApiResponse<StudioResponse>> getStudio(@PathVariable String studioId) {
         StudioResponse response = studioService.getStudio(studioId);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{studioId}/reviews")
+    public ResponseEntity<ApiResponse<Page<StudioReviewResponse>>> getReviews(
+            @PathVariable String studioId,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(studioReviewService.getReviews(studioId, pageable)));
     }
 
     // ─── Get all studios (public, paginated) ───

@@ -1,7 +1,7 @@
 package com.studioos.server.reviews;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +10,7 @@ import com.studioos.server.booking.Booking;
 import com.studioos.server.booking.BookingRepository;
 import com.studioos.server.reviews.dto.ProducerReviewResponse;
 import com.studioos.server.reviews.dto.RateProducerRequest;
+import com.studioos.server.reviews.ReviewModerationStatus;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
 import com.studioos.server.shared.enums.Role;
@@ -24,6 +25,8 @@ public class ProducerReviewService {
 
     private final BookingRepository bookingRepository;
     private final ProducerReviewRepository producerReviewRepository;
+    private final ReviewReactionRepository reviewReactionRepository;
+    private final ReviewCommentRepository reviewCommentRepository;
 
     @Transactional
     public ProducerReviewResponse submitReview(User currentUser, Integer producerId, RateProducerRequest request) {
@@ -58,15 +61,17 @@ public class ProducerReviewService {
         review.setBookingId(booking.getId());
         review.setRating(request.getRating());
         review.setReview(request.getReview());
+        review.setModerationStatus(ReviewModerationStatus.ACTIVE);
+        review.setModeratedAt(null);
+        review.setModeratedBy(null);
+        review.setModerationReason(null);
         review = producerReviewRepository.save(review);
 
         return toResponse(review);
     }
 
-    public List<ProducerReviewResponse> getReviews(Integer producerId) {
-        return producerReviewRepository.findByProducerId(producerId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+    public Page<ProducerReviewResponse> getReviews(Integer producerId, Pageable pageable) {
+        return producerReviewRepository.findByProducerIdAndModerationStatus(producerId, ReviewModerationStatus.ACTIVE, pageable).map(this::toResponse);
     }
 
     private ProducerReviewResponse toResponse(ProducerReview review) {
@@ -74,9 +79,19 @@ public class ProducerReviewService {
                 .id(review.getId())
                 .producerId(review.getProducerId())
                 .reviewerId(review.getUserId())
+                .reviewerName(review.getReviewer() != null ? review.getReviewer().getName() : null)
+                .reviewerUsername(review.getReviewer() != null ? review.getReviewer().getUsername() : null)
+                .reviewerRole(review.getReviewer() != null && review.getReviewer().getRole() != null
+                        ? review.getReviewer().getRole().name() : null)
+                .reviewerAvatar(review.getReviewer() != null ? review.getReviewer().getProfileImageThumbnail() : null)
                 .bookingId(review.getBookingId())
                 .rating(review.getRating())
                 .review(review.getReview())
+                .likes(reviewReactionRepository.countByReviewTypeAndReviewIdAndReaction(
+                        ReviewType.PRODUCER, review.getId(), ReviewReactionType.LIKE))
+                .comments(reviewCommentRepository.countByReviewTypeAndReviewIdAndDeletedAtIsNull(ReviewType.PRODUCER, review.getId()))
+                .dislikes(reviewReactionRepository.countByReviewTypeAndReviewIdAndReaction(
+                        ReviewType.PRODUCER, review.getId(), ReviewReactionType.DISLIKE))
                 .createdAt(review.getCreatedAt())
                 .build();
     }

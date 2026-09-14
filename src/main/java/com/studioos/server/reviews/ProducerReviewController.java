@@ -1,7 +1,9 @@
 package com.studioos.server.reviews;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -36,7 +38,10 @@ public class ProducerReviewController {
     }
 
     @GetMapping("/{producerId}/reviews")
-    public List<ProducerReviewResponse> getReviews(@PathVariable Integer producerId) {
-        return producerReviewService.getReviews(producerId);
+    public Page<ProducerReviewResponse> getReviews(
+            @PathVariable Integer producerId,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return producerReviewService.getReviews(producerId, pageable);
     }
 }

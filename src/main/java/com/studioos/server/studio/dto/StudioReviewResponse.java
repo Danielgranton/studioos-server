@@ -1,4 +1,4 @@
-package com.studioos.server.artist.dto;
+package com.studioos.server.studio.dto;
 
 import java.time.LocalDateTime;
 
@@ -7,9 +7,9 @@ import lombok.Value;
 
 @Value
 @Builder
-public class ArtistReviewResponse {
+public class StudioReviewResponse {
     String id;
-    Integer artistId;
+    String studioId;
     Integer reviewerId;
     String reviewerName;
     String reviewerUsername;

@@ -28,6 +28,7 @@ import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
 import com.studioos.server.shared.enums.AvailabilityStatus;
+import com.studioos.server.reviews.ReviewModerationStatus;
 import com.studioos.server.engagement.PopularityService;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.shared.storage.PresignedUrlService;
@@ -293,6 +294,10 @@ public class StudioServiceImpl {
         rating.setBookingId(booking.getId());
         rating.setRating(request.getRating());
         rating.setReview(request.getReview());
+        rating.setModerationStatus(ReviewModerationStatus.ACTIVE);
+        rating.setModeratedAt(null);
+        rating.setModeratedBy(null);
+        rating.setModerationReason(null);
         ratingRepository.save(rating);
         log.info("Studio {} rated {} by user {}", studioId, request.getRating(), currentUser.getEmail());
     }
@@ -329,7 +334,7 @@ public class StudioServiceImpl {
 
     private StudioResponse toResponse(Studio studio) {
         Double avgRating = ratingRepository.findAverageRatingByStudioId(studio.getId());
-        Long totalRatings = ratingRepository.countByStudioId(studio.getId());
+        Long totalRatings = ratingRepository.countByStudioIdAndModerationStatus(studio.getId(), ReviewModerationStatus.ACTIVE);
 
         return StudioResponse.builder()
                 .id(studio.getId())

@@ -6,7 +6,6 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import com.studioos.server.booking.Booking;
 import com.studioos.server.user.User;
 
 import jakarta.persistence.Column;
@@ -28,58 +27,51 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "producer_reviews", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "producer_id"}))
+@Table(name = "review_reports", uniqueConstraints = @UniqueConstraint(
+        columnNames = {"review_type", "review_id", "reporter_id"}))
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProducerReview {
-
+public class ReviewReport {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @Column(name = "user_id", nullable = false)
-    private Integer userId;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_type", nullable = false, length = 20)
+    private ReviewType reviewType;
+
+    @Column(name = "review_id", nullable = false, length = 36)
+    private String reviewId;
+
+    @Column(name = "reporter_id", nullable = false)
+    private Integer reporterId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", insertable = false, updatable = false)
-    private User reviewer;
+    @JoinColumn(name = "reporter_id", insertable = false, updatable = false)
+    private User reporter;
 
-    @Column(name = "producer_id", nullable = false)
-    private Integer producerId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "producer_id", insertable = false, updatable = false)
-    private User producer;
-
-    @Column(name = "booking_id", nullable = false)
-    private String bookingId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", insertable = false, updatable = false)
-    private Booking booking;
-
-    @Column(nullable = false)
-    private Float rating;
+    @Column(nullable = false, length = 40)
+    private String reason;
 
     @Column(columnDefinition = "TEXT")
-    private String review;
+    private String details;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "moderation_status", nullable = false, length = 20)
+    @Column(nullable = false, length = 20)
     @Builder.Default
-    private ReviewModerationStatus moderationStatus = ReviewModerationStatus.ACTIVE;
+    private ReviewReportStatus status = ReviewReportStatus.PENDING;
 
-    @Column(name = "moderated_at")
-    private LocalDateTime moderatedAt;
+    @Column(name = "reviewed_by")
+    private Integer reviewedBy;
 
-    @Column(name = "moderated_by")
-    private Integer moderatedBy;
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
 
-    @Column(name = "moderation_reason", columnDefinition = "TEXT")
-    private String moderationReason;
+    @Column(columnDefinition = "TEXT")
+    private String resolution;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)

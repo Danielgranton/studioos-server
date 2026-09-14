@@ -1,12 +1,18 @@
 package com.studioos.server.artist;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.studioos.server.artist.dto.ArtistReviewResponse;
 import com.studioos.server.artist.dto.RateArtistRequest;
+import com.studioos.server.reviews.ReviewCommentRepository;
+import com.studioos.server.reviews.ReviewReactionRepository;
+import com.studioos.server.reviews.ReviewReactionType;
+import com.studioos.server.reviews.ReviewType;
+import com.studioos.server.reviews.ReviewModerationStatus;
 import com.studioos.server.booking.Booking;
 import com.studioos.server.booking.BookingRepository;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
@@ -23,6 +29,8 @@ public class ArtistReviewService {
 
     private final BookingRepository bookingRepository;
     private final ArtistReviewRepository artistReviewRepository;
+    private final ReviewReactionRepository reviewReactionRepository;
+    private final ReviewCommentRepository reviewCommentRepository;
 
     @Transactional
     public ArtistReviewResponse submitReview(User currentUser, Integer artistId, RateArtistRequest request) {
@@ -52,12 +60,16 @@ public class ArtistReviewService {
         review.setBookingId(booking.getId());
         review.setRating(request.getRating());
         review.setReview(request.getReview());
+        review.setModerationStatus(ReviewModerationStatus.ACTIVE);
+        review.setModeratedAt(null);
+        review.setModeratedBy(null);
+        review.setModerationReason(null);
         return toResponse(artistReviewRepository.save(review));
     }
 
     @Transactional(readOnly = true)
-    public List<ArtistReviewResponse> getReviews(Integer artistId) {
-        return artistReviewRepository.findByArtistId(artistId).stream().map(this::toResponse).toList();
+    public Page<ArtistReviewResponse> getReviews(Integer artistId, Pageable pageable) {
+        return artistReviewRepository.findByArtistIdAndModerationStatus(artistId, ReviewModerationStatus.ACTIVE, pageable).map(this::toResponse);
     }
 
     private ArtistReviewResponse toResponse(ArtistReview review) {
@@ -65,9 +77,19 @@ public class ArtistReviewService {
                 .id(review.getId())
                 .artistId(review.getArtistId())
                 .reviewerId(review.getReviewerId())
+                .reviewerName(review.getReviewer() != null ? review.getReviewer().getName() : null)
+                .reviewerUsername(review.getReviewer() != null ? review.getReviewer().getUsername() : null)
+                .reviewerRole(review.getReviewer() != null && review.getReviewer().getRole() != null
+                        ? review.getReviewer().getRole().name() : null)
+                .reviewerAvatar(review.getReviewer() != null ? review.getReviewer().getProfileImageThumbnail() : null)
                 .bookingId(review.getBookingId())
                 .rating(review.getRating())
                 .review(review.getReview())
+                .likes(reviewReactionRepository.countByReviewTypeAndReviewIdAndReaction(
+                        ReviewType.ARTIST, review.getId(), ReviewReactionType.LIKE))
+                .comments(reviewCommentRepository.countByReviewTypeAndReviewIdAndDeletedAtIsNull(ReviewType.ARTIST, review.getId()))
+                .dislikes(reviewReactionRepository.countByReviewTypeAndReviewIdAndReaction(
+                        ReviewType.ARTIST, review.getId(), ReviewReactionType.DISLIKE))
                 .createdAt(review.getCreatedAt())
                 .build();
     }

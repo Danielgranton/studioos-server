@@ -76,6 +76,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/users/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/artists/*/services").permitAll()
                         .requestMatchers(HttpMethod.GET, "/artists/*/reviews").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/producers/*/reviews").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/reviews/*/*/interactions").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/reviews/*/*/comments").permitAll()
                         .requestMatchers(HttpMethod.GET, "/artists").permitAll()
                         .requestMatchers(HttpMethod.GET, "/search/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/platform/stats").permitAll()
@@ -109,6 +112,9 @@ public class SecurityConfig {
                         .hasAnyRole(Role.ADMIN.name(), Role.SUPER_ADMIN.name())
 
                         .requestMatchers("/admin/discovery/**")
+                        .hasAnyRole(Role.ADMIN.name(), Role.SUPER_ADMIN.name())
+
+                        .requestMatchers("/admin/reviews/**")
                         .hasAnyRole(Role.ADMIN.name(), Role.SUPER_ADMIN.name())
 
                         .requestMatchers("/admin/users/**")

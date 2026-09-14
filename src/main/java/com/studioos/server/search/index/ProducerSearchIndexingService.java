@@ -1,6 +1,7 @@
 package com.studioos.server.search.index;
 
 import com.studioos.server.reviews.ProducerReviewRepository;
+import com.studioos.server.reviews.ReviewModerationStatus;
 import com.studioos.server.beatmarketplace.BeatRepository;
 import com.studioos.server.engagement.EngagementAction;
 import com.studioos.server.engagement.EngagementEdgeRepository;
@@ -38,7 +39,7 @@ public class ProducerSearchIndexingService {
         try {
             Double averageRating = producerReviewRepository.findAverageRatingByProducerId(producer.getId());
             double avg = averageRating != null ? averageRating : 0.0;
-            int count = (int) producerReviewRepository.countByProducerId(producer.getId());
+            int count = (int) producerReviewRepository.countByProducerIdAndModerationStatus(producer.getId(), ReviewModerationStatus.ACTIVE);
             long followerCount = engagementEdgeRepository.countByTargetTypeAndTargetIdAndAction(
                     EngagementTargetType.USER, String.valueOf(producer.getId()), EngagementAction.FOLLOW);
             long beatCount = beatRepository.countByProducerId(producer.getId());

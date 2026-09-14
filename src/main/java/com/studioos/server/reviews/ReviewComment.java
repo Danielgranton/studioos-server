@@ -1,4 +1,4 @@
-package com.studioos.server.studio;
+package com.studioos.server.reviews;
 
 import java.time.LocalDateTime;
 
@@ -7,7 +7,6 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import com.studioos.server.user.User;
-import com.studioos.server.reviews.ReviewModerationStatus;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -21,65 +20,42 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Index;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "studio_ratings",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"studio_id", "user_id"}))
+@Table(name = "review_comments", indexes = @Index(
+        name = "idx_review_comments_review", columnList = "review_type, review_id, created_at"))
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class StudioRating {
+public class ReviewComment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @Column(name = "studio_id", nullable = false)
-    private String studioId;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_type", nullable = false, length = 20)
+    private ReviewType reviewType;
+
+    @Column(name = "review_id", nullable = false, length = 36)
+    private String reviewId;
 
     @Column(name = "user_id", nullable = false)
     private Integer userId;
-
-    @Column(name = "booking_id")
-    private String bookingId;
-
-    @Column(nullable = false)
-    private Float rating;
-
-    private String review;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "moderation_status", nullable = false, length = 20)
-    @Builder.Default
-    private ReviewModerationStatus moderationStatus = ReviewModerationStatus.ACTIVE;
-
-    @Column(name = "moderated_at")
-    private LocalDateTime moderatedAt;
-
-    @Column(name = "moderated_by")
-    private Integer moderatedBy;
-
-    @Column(name = "moderation_reason", columnDefinition = "TEXT")
-    private String moderationReason;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "studio_id", insertable = false, updatable = false)
-    private Studio studio;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", insertable = false, updatable = false)
-    private com.studioos.server.booking.Booking booking;
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String body;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
@@ -88,4 +64,7 @@ public class StudioRating {
     @LastModifiedDate
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 }

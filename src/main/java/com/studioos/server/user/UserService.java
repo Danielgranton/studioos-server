@@ -46,7 +46,13 @@ public class UserService {
 
     // ─── Get own profile ───
     public UserProfileResponse getMyProfile(User currentUser) {
-        return toProfileResponse(currentUser);
+        if (currentUser == null || currentUser.getId() == null) {
+            throw StudioosException.unauthorized("Authentication required");
+        }
+
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> StudioosException.unauthorized("User account is no longer available"));
+        return toProfileResponse(user);
     }
 
     // ─── Update own profile ───
@@ -245,10 +251,15 @@ public class UserService {
         String remainder = reference.substring("s3://".length());
         int separator = remainder.indexOf('/');
         if (separator <= 0 || separator == remainder.length() - 1) return reference;
-        return presignedUrlService.generateDownloadUrl(
-                remainder.substring(0, separator),
-                remainder.substring(separator + 1),
-                profileUrlExpirySeconds);
+        try {
+            return presignedUrlService.generateDownloadUrl(
+                    remainder.substring(0, separator),
+                    remainder.substring(separator + 1),
+                    profileUrlExpirySeconds);
+        } catch (RuntimeException exception) {
+            log.warn("Could not presign profile image URL; returning profile without image", exception);
+            return null;
+        }
     }
 
     private AvailabilityStatus toAvailabilityStatus(boolean available) {

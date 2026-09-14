@@ -9,6 +9,8 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -23,6 +25,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import com.studioos.server.booking.Booking;
+import com.studioos.server.reviews.ReviewModerationStatus;
 import com.studioos.server.user.User;
 
 @Entity
@@ -52,6 +55,20 @@ public class ArtistReview {
 
     @Column(columnDefinition = "TEXT")
     private String review;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "moderation_status", nullable = false, length = 20)
+    @Builder.Default
+    private ReviewModerationStatus moderationStatus = ReviewModerationStatus.ACTIVE;
+
+    @Column(name = "moderated_at")
+    private LocalDateTime moderatedAt;
+
+    @Column(name = "moderated_by")
+    private Integer moderatedBy;
+
+    @Column(name = "moderation_reason", columnDefinition = "TEXT")
+    private String moderationReason;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reviewer_id", insertable = false, updatable = false)

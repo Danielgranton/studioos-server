@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import com.studioos.server.booking.BookingRepository;
 import com.studioos.server.artist.ArtistReviewRepository;
 import com.studioos.server.reviews.ProducerReviewRepository;
+import com.studioos.server.reviews.ReviewModerationStatus;
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
 import com.studioos.server.studio.StudioRatingRepository;
@@ -30,7 +31,8 @@ public class PopularityService {
         long completed = bookingRepository.countByArtistIdAndStatusAndPaymentStatus(userId, BookingStatus.DELIVERED, BookingPaymentStatus.PAID)
                 + bookingRepository.countByProducerIdAndStatusAndPaymentStatus(userId, BookingStatus.DELIVERED, BookingPaymentStatus.PAID);
         double rating = average(artistReviewRepository.findAverageRatingByArtistId(userId), producerReviewRepository.findAverageRatingByProducerId(userId));
-        long reviews = artistReviewRepository.countByArtistId(userId) + producerReviewRepository.countByProducerId(userId);
+        long reviews = artistReviewRepository.countByArtistIdAndModerationStatus(userId, ReviewModerationStatus.ACTIVE)
+                + producerReviewRepository.countByProducerIdAndModerationStatus(userId, ReviewModerationStatus.ACTIVE);
         return score(followers, favorites, views, completed, rating, reviews);
     }
 
@@ -40,7 +42,7 @@ public class PopularityService {
         long views = viewRepository.countByTargetTypeAndTargetId(EngagementTargetType.STUDIO, studioId);
         long completed = bookingRepository.countByStudioIdAndStatusAndPaymentStatus(studioId, BookingStatus.DELIVERED, BookingPaymentStatus.PAID);
         double rating = valueOrZero(studioRatingRepository.findAverageRatingByStudioId(studioId));
-        long reviews = studioRatingRepository.countByStudioId(studioId);
+        long reviews = studioRatingRepository.countByStudioIdAndModerationStatus(studioId, ReviewModerationStatus.ACTIVE);
         return score(followers, favorites, views, completed, rating, reviews);
     }
 
