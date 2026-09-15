@@ -202,6 +202,7 @@ public class StudioServiceImpl {
     }
 
     // ─── Get single studio ───
+    @Transactional(readOnly = true)
     public StudioResponse getStudio(String studioId) {
         Studio studio = studioRepository.findById(studioId)
                 .orElseThrow(() -> StudioosException.notFound("Studio not found"));
@@ -209,6 +210,7 @@ public class StudioServiceImpl {
     }
 
     // ─── Get all studios (paginated + filters) ───
+    @Transactional(readOnly = true)
     public PageResponse<StudioResponse> getAllStudios(
             String location, Integer maxPrice, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
@@ -223,6 +225,7 @@ public class StudioServiceImpl {
         );
     }
 
+    @Transactional(readOnly = true)
     public PageResponse<StudioResponse> getFeaturedStudios(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<Studio> studios = studioRepository.findFeatured(pageable);
@@ -230,6 +233,7 @@ public class StudioServiceImpl {
         return PageResponse.from(studios.map(this::toResponse));
     }
 
+    @Transactional(readOnly = true)
     public PageResponse<StudioResponse> getFeaturedStudios(String filter, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         String normalizedFilter = filter == null ? "top-rated" : filter.trim().toLowerCase();
