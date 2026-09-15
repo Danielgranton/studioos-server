@@ -254,6 +254,7 @@ public class StudioServiceImpl {
     }
 
     // ─── Get my studios ───
+    @Transactional(readOnly = true)
     public List<StudioResponse> getMyStudios(User currentUser) {
         return studioRepository.findByOwnerId(currentUser.getId())
                 .stream()
