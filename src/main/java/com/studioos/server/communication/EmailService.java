@@ -32,10 +32,10 @@ public class EmailService {
 
     @Async
     public void sendNotification(String to, String subject, String body) {
-        send(to, subject, body);
+        sendNotificationNow(to, subject, body);
     }
 
-    private void send(String to, String subject, String body) {
+    public boolean sendNotificationNow(String to, String subject, String body) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
@@ -46,8 +46,14 @@ public class EmailService {
             message.setText(body);
             mailSender.send(message);
             log.info("Email sent to: {}", to);
+            return true;
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage());
+            return false;
         }
+    }
+
+    private void send(String to, String subject, String body) {
+        sendNotificationNow(to, subject, body);
     }
 }

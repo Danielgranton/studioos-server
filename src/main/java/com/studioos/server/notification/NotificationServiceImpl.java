@@ -2,8 +2,6 @@ package com.studioos.server.notification;
 
 import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.shared.exceptions.StudioosException;
-import com.studioos.server.communication.EmailService;
-import com.studioos.server.communication.SmsService;
 import com.studioos.server.notification.dto.CreateNotificationRequest;
 import com.studioos.server.notification.dto.NotificationResponse;
 import com.studioos.server.user.User;
@@ -25,8 +23,8 @@ public class NotificationServiceImpl {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final NotificationPreferenceService notificationPreferenceService;
-    private final EmailService emailService;
-    private final SmsService smsService;
+    private final NotificationOutboxService notificationOutboxService;
+    private final NotificationRateLimitService notificationRateLimitService;
 
     // ─── Create notification (respects per-type channel preferences) ───
     @Transactional
@@ -54,12 +52,26 @@ public class NotificationServiceImpl {
             log.info("In-app notification suppressed for user {} type {}", user.getEmail(), request.getType());
         }
 
-        if (preference.isEmailEnabled()) {
-            emailService.sendNotification(user.getEmail(), request.getTitle(), request.getMessage());
+        if (preference.isEmailEnabled() && notificationRateLimitService.allowEmail(user)) {
+            notificationOutboxService.enqueueEmail(
+                    user.getId(),
+                    notification == null ? null : notification.getId(),
+                    user.getEmail(),
+                    request.getTitle(),
+                    request.getMessage()
+            );
         }
 
-        if (preference.isSmsEnabled() && user.getPhone() != null && !user.getPhone().isEmpty()) {
-            smsService.sendNotification(user.getPhone(), request.getMessage());
+        if (preference.isSmsEnabled()
+                && user.getPhone() != null
+                && !user.getPhone().isEmpty()
+                && notificationRateLimitService.allowSms(user)) {
+            notificationOutboxService.enqueueSms(
+                    user.getId(),
+                    notification == null ? null : notification.getId(),
+                    user.getPhone(),
+                    request.getMessage()
+            );
         }
 
         return notification == null ? null : toResponse(notification);
@@ -107,14 +119,8 @@ public class NotificationServiceImpl {
     // ─── Mark all notifications as read ───
     @Transactional
     public void markAllAsRead(User currentUser) {
-        notificationRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getId())
-                .stream()
-                .filter(n -> !n.getIsRead())
-                .forEach(n -> {
-                    n.setIsRead(true);
-                    notificationRepository.save(n);
-                });
-        log.info("All notifications marked as read for user: {}", currentUser.getId());
+        int updated = notificationRepository.markAllAsReadByUserId(currentUser.getId());
+        log.info("Marked {} notifications as read for user: {}", updated, currentUser.getId());
     }
 
     // ─── Delete notification ───

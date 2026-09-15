@@ -12,10 +12,14 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.springframework.validation.annotation.Validated;
 
 @RestController
 @RequestMapping("/notifications")
 @RequiredArgsConstructor
+@Validated
 public class NotificationController {
 
     private final NotificationServiceImpl notificationService;
@@ -25,8 +29,8 @@ public class NotificationController {
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<NotificationResponse>>> getMyNotifications(
             @AuthenticationPrincipal User currentUser,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "0") @Min(0) @Max(10_000) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size
     ) {
         PageResponse<NotificationResponse> response = notificationService.getMyNotifications(currentUser, page, size);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -36,8 +40,8 @@ public class NotificationController {
     @GetMapping("/unread")
     public ResponseEntity<ApiResponse<PageResponse<NotificationResponse>>> getUnreadNotifications(
             @AuthenticationPrincipal User currentUser,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "0") @Min(0) @Max(10_000) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size
     ) {
         PageResponse<NotificationResponse> response = notificationService.getUnreadNotifications(currentUser, page, size);
         return ResponseEntity.ok(ApiResponse.success(response));

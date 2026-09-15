@@ -36,11 +36,6 @@ spring:
           starttls:
             enable: ${COMMUNICATION_SMTP_STARTTLS:true}
 
-communication:
-  email:
-    from: ${COMMUNICATION_EMAIL_FROM:${COMMUNICATION_SMTP_USERNAME:${MAIL_USERNAME:}}}
-    from-name: ${COMMUNICATION_EMAIL_FROM_NAME:StudioOS}
-
 # ─── ASYNC (for email/sms sending) ───
   task:
     execution:
@@ -86,6 +81,11 @@ communication:
       port: ${REDIS_PORT:6379}
       repositories:
         enabled: false
+
+communication:
+  email:
+    from: ${COMMUNICATION_EMAIL_FROM:${COMMUNICATION_SMTP_USERNAME:${MAIL_USERNAME:}}}
+    from-name: ${COMMUNICATION_EMAIL_FROM_NAME:StudioOS}
 
 # ─── SERVER ───
 server:
@@ -161,11 +161,17 @@ mpesa:
   callback-url: ${MPESA_CALLBACK_URL}
   timeout-url: ${MPESA_TIMEOUT_URL}
 
-# ─── AFRICA'S TALKING ───
-africastalking:
-  username: ${AFRICASTALKING_USERNAME:${AT_USERNAME:}}
-  apikey: ${AFRICASTALKING_API_KEY:${AT_API_KEY:}}
-  sender-id: ${AFRICASTALKING_SENDER_ID:${AT_SENDER_ID:}}
+# ─── TWILIO SMS ───
+twilio:
+  enabled: ${TWILIO_ENABLED:false}
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+  from-number: ${TWILIO_FROM_NUMBER:}
+
+notification:
+  retention:
+    days: ${NOTIFICATION_RETENTION_DAYS:90}
+    cron: ${NOTIFICATION_RETENTION_CRON:0 0 3 * * *}
 
 # ─── PLATFORM ───
 platform:

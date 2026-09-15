@@ -1,36 +1,50 @@
 package com.studioos.server.communication;
 
-import com.africastalking.AfricasTalking;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
+
+import com.studioos.server.notification.NotificationDeliveryResult;
 
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SmsService {
+
+    private final SmsProvider smsProvider;
 
     @Async
     public CompletableFuture<Boolean> sendOtp(String phone, String otp) {
-        return send(phone, "Your StudioOS code is: " + otp, "OTP");
+        return CompletableFuture.completedFuture(
+                sendNow(phone, "Your StudioOS code is: " + otp, "OTP") != null
+        );
     }
 
     @Async
     public CompletableFuture<Boolean> sendNotification(String phone, String message) {
-        return send(phone, message, "notification");
+        return CompletableFuture.completedFuture(sendNotificationNow(phone, message));
     }
 
-    private CompletableFuture<Boolean> send(String phone, String message, String kind) {
+    public boolean sendNotificationNow(String phone, String message) {
+        return sendNotificationNowWithId(phone, message).accepted();
+    }
+
+    public NotificationDeliveryResult sendNotificationNowWithId(String phone, String message) {
+        String messageId = sendNow(phone, message, "notification");
+        return new NotificationDeliveryResult(messageId != null, messageId);
+    }
+
+    private String sendNow(String phone, String message, String kind) {
         try {
-            com.africastalking.SmsService sms =
-                    AfricasTalking.getService(AfricasTalking.SERVICE_SMS);
-            var response = sms.send(message, new String[]{phone}, false);
-            log.info("[SMS] Sent {} to {} | response: {}", kind, maskPhone(phone), response);
-            return CompletableFuture.completedFuture(true);
+            String messageSid = smsProvider.send(phone, message);
+            log.info("[SMS] Sent {} to {} | provider message: {}", kind, maskPhone(phone), messageSid);
+            return messageSid;
         } catch (Exception e) {
             log.error("[SMS] Failed to send {} to {}: {}", kind, maskPhone(phone), e.getMessage(), e);
-            return CompletableFuture.completedFuture(false);
+            return null;
         }
     }
 
