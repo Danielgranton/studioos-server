@@ -10,6 +10,7 @@ import com.studioos.server.shared.enums.BeatPaymentStatus;
 public interface BeatPurchaseRepository extends JpaRepository<BeatPurchase, String> {
     List<BeatPurchase> findByBuyerId(Integer buyerId);
     List<BeatPurchase> findByBeatId(String beatId);
+    List<BeatPurchase> findByBeatIdIn(List<String> beatIds);
     boolean existsByBeatIdAndBuyerIdAndStatus(String beatId, Integer buyerId, BeatPaymentStatus status);
     Optional<BeatPurchase> findByTransactionId(String transactionId);
     Optional<BeatPurchase> findByBeatIdAndBuyerIdAndStatus(String beatId, Integer buyerId, BeatPaymentStatus status);

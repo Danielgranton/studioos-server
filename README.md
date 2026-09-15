@@ -84,6 +84,21 @@ export $(cat .env | xargs)
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=grpc-enabled
 ```
 
+For direct browser uploads to S3, configure the bucket CORS policy once:
+
+```bash
+aws s3api put-bucket-cors \
+  --bucket "$AWS_BUCKET_NAME" \
+  --region "$AWS_REGION" \
+  --cors-configuration file://docker/s3-cors.json
+```
+
+If a migration was renamed, use a clean start so stale files are removed from `target/classes`:
+
+```bash
+./mvnw clean spring-boot:run -Dspring-boot.run.profiles=grpc-enabled
+```
+
 The server will:
 
 - call the media service at `MEDIA_SERVICE_HOST:MEDIA_SERVICE_PORT`

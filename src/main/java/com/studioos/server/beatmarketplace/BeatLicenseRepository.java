@@ -11,6 +11,7 @@ import com.studioos.server.shared.enums.LicenseType;
 
 public interface BeatLicenseRepository extends JpaRepository<BeatLicense, String> {
     List<BeatLicense> findByBeatId(String beatId);
+    List<BeatLicense> findByBeatIdInAndActiveTrue(List<String> beatIds);
     List<BeatLicense> findByBeatIdAndActiveTrue(String beatId);
     Optional<BeatLicense> findByBeatIdAndTypeAndActiveTrue(String beatId, LicenseType type);
 

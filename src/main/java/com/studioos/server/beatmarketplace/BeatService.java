@@ -261,6 +261,22 @@ public class BeatService {
     }
 
     @Transactional
+    public void archiveBeat(Integer producerId, String beatId) {
+        Beat beat = beatRepository.findById(beatId)
+                .orElseThrow(() -> new IllegalArgumentException("Beat not found: " + beatId));
+
+        if (!beat.getProducerId().equals(producerId)) {
+            throw new SecurityException("Producer does not own this beat");
+        }
+
+        if (beat.getStatus() != BeatStatus.ARCHIVED) {
+            beat.setStatus(BeatStatus.ARCHIVED);
+            beatRepository.save(beat);
+            applicationEventPublisher.publishEvent(new BeatUpdatedEvent(beat.getId()));
+        }
+    }
+
+    @Transactional
     public void handleJobCallback(MediaJobCallbackRequest callback) {
         MediaJobResult result = MediaJobResult.builder()
                 .jobId(callback.getExternalJobId())
@@ -304,14 +320,23 @@ public class BeatService {
     }
 
     private void submitProcessingJobs(Beat beat, UploadSession audioSession, UploadSession coverSession) {
-        submitAndTrack(beat.getId(), MediaJobOperation.AUDIO_NORMALIZE, audioSession.getObjectKey(), "{}");
-        submitAndTrack(beat.getId(), MediaJobOperation.AUDIO_PREVIEW, audioSession.getObjectKey(),
+        String audioReference = mediaReference(audioSession.getBucket(), audioSession.getObjectKey());
+        String coverReference = mediaReference(coverSession.getBucket(), coverSession.getObjectKey());
+        submitAndTrack(beat.getId(), MediaJobOperation.AUDIO_NORMALIZE, audioReference, "{}");
+        submitAndTrack(beat.getId(), MediaJobOperation.AUDIO_PREVIEW, audioReference,
                 "{\"start\":\"00:00:00\",\"end\":\"00:00:30\"}");
-        submitAndTrack(beat.getId(), MediaJobOperation.AUDIO_WAVEFORM, audioSession.getObjectKey(), "{}");
-        submitAndTrack(beat.getId(), MediaJobOperation.COVER_RESIZE, coverSession.getObjectKey(),
+        submitAndTrack(beat.getId(), MediaJobOperation.AUDIO_WAVEFORM, audioReference, "{}");
+        submitAndTrack(beat.getId(), MediaJobOperation.COVER_RESIZE, coverReference,
                 "{\"width\":1000,\"height\":1000}");
-        submitAndTrack(beat.getId(), MediaJobOperation.COVER_THUMBNAIL, coverSession.getObjectKey(), "{}");
-        submitAndTrack(beat.getId(), MediaJobOperation.COVER_WEBP, coverSession.getObjectKey(), "{}");
+        submitAndTrack(beat.getId(), MediaJobOperation.COVER_THUMBNAIL, coverReference, "{}");
+        submitAndTrack(beat.getId(), MediaJobOperation.COVER_WEBP, coverReference, "{}");
+    }
+
+    private String mediaReference(String bucket, String objectKey) {
+        if (bucket == null || bucket.isBlank()) {
+            throw new IllegalStateException("S3 bucket is required for beat media processing");
+        }
+        return "s3://" + bucket + "/" + objectKey;
     }
 
     private void submitAndTrack(String beatId, MediaJobOperation operation, String assetReference, String parametersJson) {
@@ -363,7 +388,7 @@ public class BeatService {
             }
 
             for (MediaProcessingJob job : jobs) {
-                String ref = job.getResultReference();
+                String ref = normalizeMediaReference(job.getResultReference());
                 switch (job.getOperation()) {
                     case AUDIO_NORMALIZE -> beat.setAudioUrl(ref);
                     case AUDIO_PREVIEW -> beat.setPreviewUrl(ref);
@@ -384,6 +409,14 @@ public class BeatService {
                     "Your beat \"" + beat.getTitle() + "\" is ready.",
                     beat.getId());
         });
+    }
+
+    private String normalizeMediaReference(String reference) {
+        if (reference == null || mediaBucket == null || mediaBucket.isBlank()) {
+            return reference;
+        }
+        String prefix = "s3://" + mediaBucket + "/";
+        return reference.startsWith(prefix) ? reference.substring(prefix.length()) : reference;
     }
 
     private void notifyProducer(Integer producerId, NotificationType type, String title, String message,
