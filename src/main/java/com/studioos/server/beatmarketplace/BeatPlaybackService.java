@@ -38,7 +38,8 @@ public class BeatPlaybackService {
             throw new IllegalStateException("Beat is not ready for playback: " + beat.getStatus());
         }
 
-        if (beat.getVisibility() == BeatVisibility.PRIVATE) {
+        boolean isProducer = userId != null && beat.getProducerId().equals(userId);
+        if (beat.getVisibility() == BeatVisibility.PRIVATE && !isProducer) {
             throw new SecurityException("This beat is private and cannot be previewed");
         }
 

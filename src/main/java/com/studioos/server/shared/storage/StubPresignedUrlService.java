@@ -24,4 +24,9 @@ public class StubPresignedUrlService implements PresignedUrlService {
     public Optional<StorageObjectMetadata> objectMetadata(String bucket, String objectKey) {
         return Optional.of(new StorageObjectMetadata(1L, null, "stub", Instant.now()));
     }
+
+    @Override
+    public void deleteObject(String bucket, String objectKey) {
+        // The stub does not persist uploaded objects.
+    }
 }

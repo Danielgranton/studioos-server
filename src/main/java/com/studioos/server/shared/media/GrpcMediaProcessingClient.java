@@ -88,8 +88,11 @@ public class GrpcMediaProcessingClient implements MediaProcessingClient {
     public boolean health() {
         Media.HealthResponse response = withRetry(
                 () -> timedBlockingStub().health(Media.HealthRequest.newBuilder().build()), "health");
-        return response != null && response.getStatus() != null
-                && response.getStatus().equalsIgnoreCase("SERVING");
+        String status = response == null ? null : response.getStatus();
+        boolean healthy = status != null
+                && (status.equalsIgnoreCase("SERVING") || status.equalsIgnoreCase("UP"));
+        log.debug("Media service health response: status={}, healthy={}", status, healthy);
+        return healthy;
     }
 
     @Override

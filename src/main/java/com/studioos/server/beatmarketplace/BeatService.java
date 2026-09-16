@@ -3,6 +3,7 @@ package com.studioos.server.beatmarketplace;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,6 +48,7 @@ public class BeatService {
     private static final long MAX_COVER_BYTES = 10L * 1024L * 1024L;
 
     private final BeatRepository beatRepository;
+    private final BeatPurchaseRepository beatPurchaseRepository;
     private final BeatGenreRepository beatGenreRepository;
     private final StudioRepository studioRepository;
     private final UploadSessionRepository uploadSessionRepository;
@@ -180,11 +182,15 @@ public class BeatService {
         uploadSessionRepository.save(audioSession);
         uploadSessionRepository.save(coverSession);
 
+        if (!mediaProcessingClient.health()) {
+            throw new IllegalStateException("Media processing service is unavailable; the beat was not published");
+        }
+
+        submitProcessingJobs(beat, audioSession, coverSession);
+
         beat.setStatus(BeatStatus.PROCESSING);
         beat = beatRepository.save(beat);
         applicationEventPublisher.publishEvent(new BeatUpdatedEvent(beat.getId()));
-
-        submitProcessingJobs(beat, audioSession, coverSession);
 
         return BeatUploadCompleteResponse.builder()
                 .beatId(beat.getId())
@@ -274,6 +280,47 @@ public class BeatService {
             beatRepository.save(beat);
             applicationEventPublisher.publishEvent(new BeatUpdatedEvent(beat.getId()));
         }
+    }
+
+    @Transactional
+    public void cancelUpload(Integer producerId, String beatId) {
+        Beat beat = findOwnedBeat(producerId, beatId);
+        if (beat.getStatus() != BeatStatus.UPLOADING) {
+            throw new IllegalStateException("Only an unfinished upload can be cancelled");
+        }
+
+        List<UploadSession> sessions = uploadSessionRepository.findByBeatId(beatId);
+        sessions.forEach(session -> presignedUrlService.deleteObject(session.getBucket(), session.getObjectKey()));
+        uploadSessionRepository.deleteAll(sessions);
+        beatRepository.delete(beat);
+    }
+
+    @Transactional
+    public void deleteArchivedBeat(Integer producerId, String beatId) {
+        Beat beat = findOwnedBeat(producerId, beatId);
+        if (beat.getStatus() != BeatStatus.ARCHIVED) {
+            throw new IllegalStateException("Only archived beats can be permanently deleted");
+        }
+        if (beatPurchaseRepository.existsByBeatId(beatId)) {
+            throw new IllegalStateException("This beat has sales history and cannot be permanently deleted");
+        }
+
+        List<UploadSession> sessions = uploadSessionRepository.findByBeatId(beatId);
+        sessions.forEach(session -> presignedUrlService.deleteObject(session.getBucket(), session.getObjectKey()));
+        uploadSessionRepository.deleteAll(sessions);
+        Stream.of(beat.getAudioUrl(), beat.getPreviewUrl(), beat.getWaveformUrl(), beat.getCoverUrl(), beat.getThumbnailUrl())
+                .filter(reference -> reference != null && !reference.isBlank())
+                .forEach(reference -> presignedUrlService.deleteObject(mediaBucket, reference));
+        beatRepository.delete(beat);
+    }
+
+    private Beat findOwnedBeat(Integer producerId, String beatId) {
+        Beat beat = beatRepository.findById(beatId)
+                .orElseThrow(() -> new IllegalArgumentException("Beat not found: " + beatId));
+        if (!beat.getProducerId().equals(producerId)) {
+            throw new SecurityException("Producer does not own this beat");
+        }
+        return beat;
     }
 
     @Transactional

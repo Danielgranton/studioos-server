@@ -19,11 +19,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.studioos.server.beatmarketplace.dto.BeatSearchRequest;
 import com.studioos.server.beatmarketplace.dto.BeatSaleResponse;
 import com.studioos.server.beatmarketplace.dto.BeatSummaryResponse;
 import com.studioos.server.user.UserRepository;
+import com.studioos.server.shared.storage.PresignedUrlService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -37,6 +39,10 @@ public class BeatBrowseService {
     private final BeatPurchaseRepository beatPurchaseRepository;
     private final BeatPlayHistoryRepository beatPlayHistoryRepository;
     private final UserRepository userRepository;
+    private final PresignedUrlService presignedUrlService;
+
+    @Value("${storage.s3.bucket}")
+    private String mediaBucket;
 
     @Transactional(readOnly = true)
     public Page<BeatSummaryResponse> search(BeatSearchRequest request) {
@@ -228,8 +234,8 @@ public class BeatBrowseService {
                 .description(beat.getDescription())
                 .mood(beat.getMood())
                 .studioId(beat.getStudioId())
-                .coverUrl(beat.getCoverUrl())
-                .thumbnailUrl(beat.getThumbnailUrl())
+                .coverUrl(resolveMediaUrl(beat.getCoverUrl()))
+                .thumbnailUrl(resolveMediaUrl(beat.getThumbnailUrl()))
                 .genreName(beat.getGenre() != null ? beat.getGenre().getName() : null)
                 .bpm(beat.getBpm())
                 .keySignature(beat.getKeySignature())
@@ -246,9 +252,25 @@ public class BeatBrowseService {
                 .verificationStatus(producerVerification != null ? producerVerification.status() : null)
                 .status(beat.getStatus() != null ? beat.getStatus().name() : null)
                 .visibility(beat.getVisibility() != null ? beat.getVisibility().name() : null)
-                .waveformUrl(beat.getWaveformUrl())
+                .waveformUrl(resolveMediaUrl(beat.getWaveformUrl()))
                 .previewAvailable(beat.getPreviewUrl() != null && !beat.getPreviewUrl().isBlank())
                 .build();
+    }
+
+    private String resolveMediaUrl(String reference) {
+        if (reference == null || reference.isBlank() || mediaBucket == null || mediaBucket.isBlank()) {
+            return reference;
+        }
+        if (reference.startsWith("http://") || reference.startsWith("https://")) {
+            return reference;
+        }
+
+        String objectKey = reference;
+        String s3Prefix = "s3://" + mediaBucket + "/";
+        if (reference.startsWith(s3Prefix)) {
+            objectKey = reference.substring(s3Prefix.length());
+        }
+        return presignedUrlService.generateDownloadUrl(mediaBucket, objectKey, 3600);
     }
 
     private record ProducerVerification(boolean verified,

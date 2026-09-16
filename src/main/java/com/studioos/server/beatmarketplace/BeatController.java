@@ -59,6 +59,22 @@ public class BeatController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{beatId}/upload")
+    public ResponseEntity<Void> cancelUpload(
+            @AuthenticationPrincipal User producer,
+            @PathVariable String beatId) {
+        beatService.cancelUpload(producer.getId(), beatId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{beatId}/permanent")
+    public ResponseEntity<Void> deleteArchivedBeat(
+            @AuthenticationPrincipal User producer,
+            @PathVariable String beatId) {
+        beatService.deleteArchivedBeat(producer.getId(), beatId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{beatId}/upload-sessions/refresh")
     public RefreshUploadSessionResponse refreshUploadSessions(
             @AuthenticationPrincipal User producer,

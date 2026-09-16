@@ -15,6 +15,7 @@ import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
@@ -83,6 +84,15 @@ public class AwsPresignedUrlService implements PresignedUrlService {
         } catch (SdkException e) {
             log.warn("S3 headObject failed for s3://{}/{}: {}", bucket, objectKey, e.getMessage());
             return Optional.empty();
+        }
+    }
+
+    @Override
+    public void deleteObject(String bucket, String objectKey) {
+        try {
+            s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(objectKey).build());
+        } catch (SdkException e) {
+            log.warn("S3 deleteObject failed for s3://{}/{}: {}", bucket, objectKey, e.getMessage());
         }
     }
 }
