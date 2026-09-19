@@ -19,4 +19,5 @@ public class MediaJobResult {
     private String errorMessage;
     private long createdAtUnixMs;
     private long updatedAtUnixMs;
+    private Integer durationSeconds;
 }

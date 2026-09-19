@@ -127,6 +127,7 @@ public class GrpcMediaProcessingClient implements MediaProcessingClient {
                 .errorMessage(blankToNull(response.getErrorMessage()))
                 .createdAtUnixMs(response.getCreatedAtUnixMs())
                 .updatedAtUnixMs(response.getUpdatedAtUnixMs())
+                .durationSeconds(response.getDurationSeconds() > 0 ? response.getDurationSeconds() : null)
                 .build();
     }
 

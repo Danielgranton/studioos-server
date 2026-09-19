@@ -7,6 +7,7 @@ import com.studioos.server.beatmarketplace.dto.UpdateBeatRequest;
 import com.studioos.server.beatmarketplace.dto.RefreshUploadSessionResponse;
 import com.studioos.server.beatmarketplace.dto.BeatSaleResponse;
 import com.studioos.server.beatmarketplace.dto.BeatSummaryResponse;
+import com.studioos.server.beatmarketplace.dto.BeatLikeResponse;
 import com.studioos.server.user.User;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,28 @@ public class BeatController {
     private final BeatService beatService;
     private final BeatBrowseService beatBrowseService;
     private final BeatGenreRepository beatGenreRepository;
+    private final BeatLikeService beatLikeService;
+
+    @GetMapping("/{beatId}/like")
+    public BeatLikeResponse getLikeState(
+            @PathVariable String beatId,
+            @AuthenticationPrincipal User user) {
+        return beatLikeService.getState(beatId, user);
+    }
+
+    @PostMapping("/{beatId}/like")
+    public BeatLikeResponse like(
+            @PathVariable String beatId,
+            @AuthenticationPrincipal User user) {
+        return beatLikeService.like(beatId, user);
+    }
+
+    @DeleteMapping("/{beatId}/like")
+    public BeatLikeResponse unlike(
+            @PathVariable String beatId,
+            @AuthenticationPrincipal User user) {
+        return beatLikeService.unlike(beatId, user);
+    }
 
     @GetMapping("/my")
     public java.util.List<BeatSummaryResponse> getMyBeats(@AuthenticationPrincipal User producer) {

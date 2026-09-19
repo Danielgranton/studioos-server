@@ -51,6 +51,7 @@ public class GrpcMediaCallbackService extends MediaCallbackServiceGrpc.MediaCall
         callback.setStatus(parseStatus(request.getStatus()));
         callback.setResultReference(blankToNull(request.getResultReference()));
         callback.setErrorMessage(blankToNull(request.getErrorMessage()));
+        callback.setDurationSeconds(request.getDurationSeconds() > 0 ? request.getDurationSeconds() : null);
         return callback;
     }
 

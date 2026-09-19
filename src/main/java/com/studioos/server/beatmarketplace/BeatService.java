@@ -131,6 +131,7 @@ public class BeatService {
                 .bpm(request.getBpm())
                 .keySignature(request.getKeySignature())
                 .mood(request.getMood())
+                .duration(request.getDuration())
                 .status(BeatStatus.UPLOADING)
                 .visibility(request.getVisibility())
                 .build();
@@ -329,8 +330,9 @@ public class BeatService {
     @Transactional
     public void retryProcessing(Integer producerId, String beatId) {
         Beat beat = findOwnedBeat(producerId, beatId);
-        if (beat.getStatus() != BeatStatus.FAILED) {
-            throw new IllegalStateException("Only failed beats can be retried");
+        boolean durationRepair = beat.getStatus() == BeatStatus.READY && beat.getDuration() == null;
+        if (beat.getStatus() != BeatStatus.FAILED && !durationRepair) {
+            throw new IllegalStateException("Only failed beats or ready beats missing duration can be retried");
         }
 
         List<MediaProcessingJob> previousJobs = mediaProcessingJobRepository.findByBeatId(beatId);
@@ -449,6 +451,7 @@ public class BeatService {
                 .status(callback.isSuccess() ? MediaJobStatus.SUCCESS : MediaJobStatus.FAILED)
                 .resultReference(callback.getResultReference())
                 .errorMessage(callback.getErrorMessage())
+                .durationSeconds(callback.getDurationSeconds())
                 .build();
         applyMediaJobResult(result);
     }
@@ -471,6 +474,16 @@ public class BeatService {
         job.setResultReference(result.getResultReference());
         job.setErrorMessage(result.getErrorMessage());
         mediaProcessingJobRepository.save(job);
+
+        if (nextStatus == MediaJobStatus.SUCCESS
+                && job.getOperation() == MediaJobOperation.AUDIO_NORMALIZE
+                && result.getDurationSeconds() != null
+                && result.getDurationSeconds() > 0) {
+            beatRepository.findById(job.getBeatId()).ifPresent(beat -> {
+                beat.setDuration(result.getDurationSeconds());
+                beatRepository.save(beat);
+            });
+        }
 
         if (nextStatus == MediaJobStatus.FAILED) {
             log.error("Media job failed: beat={} operation={} error={}",

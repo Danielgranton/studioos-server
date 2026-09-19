@@ -17,6 +17,7 @@ public class MediaProcessingCallbackRequest {
     private MediaJobStatus status;
     private String resultReference;
     private String errorMessage;
+    private Integer durationSeconds;
 
     public String resolvedJobId() {
         return jobId != null && !jobId.isBlank() ? jobId : externalJobId;

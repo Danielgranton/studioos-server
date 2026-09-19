@@ -9,5 +9,6 @@ public interface BeatLikeRepository extends JpaRepository<BeatLike, String> {
     List<BeatLike> findByUserId(Integer userId);
     Optional<BeatLike> findByUserIdAndBeatId(Integer userId, String beatId);
     boolean existsByUserIdAndBeatId(Integer userId, String beatId);
+    long countByBeatId(String beatId);
     void deleteByUserIdAndBeatId(Integer userId, String beatId);
 }

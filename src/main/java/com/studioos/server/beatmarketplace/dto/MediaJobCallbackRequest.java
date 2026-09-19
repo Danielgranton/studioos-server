@@ -8,4 +8,5 @@ public class MediaJobCallbackRequest {
     private boolean success;
     private String resultReference;   // populated only when success = true
     private String errorMessage;      // populated only when success = false
+    private Integer durationSeconds;
 }

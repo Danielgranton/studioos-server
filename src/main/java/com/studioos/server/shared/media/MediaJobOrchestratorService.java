@@ -62,6 +62,7 @@ public class MediaJobOrchestratorService {
                 .status(request.getStatus() == null ? MediaJobStatus.QUEUED : request.getStatus())
                 .resultReference(request.getResultReference())
                 .errorMessage(request.getErrorMessage())
+                .durationSeconds(request.getDurationSeconds())
                 .build();
 
         dispatchResult(result);
