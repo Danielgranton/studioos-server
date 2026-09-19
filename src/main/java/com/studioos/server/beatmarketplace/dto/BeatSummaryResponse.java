@@ -14,6 +14,7 @@ public class BeatSummaryResponse {
     private String description;
     private String mood;
     private String studioId;
+    private String genreId;
     private String coverUrl;
     private String thumbnailUrl;
     private String genreName;

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -139,8 +141,6 @@ class BeatServiceTest {
                 .thenReturn(
                         Optional.of(new StorageObjectMetadata(1024L, "audio/mpeg", "\"etag-a\"", Instant.now())),
                         Optional.of(new StorageObjectMetadata(2048L, "image/jpeg", "\"etag-c\"", Instant.now())));
-        when(mediaProcessingClient.submitJob(anyString(), anyString(), anyString()))
-                .thenReturn("job-1", "job-2", "job-3", "job-4", "job-5", "job-6");
         when(mediaProcessingJobRepository.save(any(MediaProcessingJob.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -151,6 +151,49 @@ class BeatServiceTest {
         assertThat(audioSession.getSizeBytes()).isEqualTo(1024L);
         assertThat(audioSession.getChecksum()).isEqualTo("etag-a");
         assertThat(coverSession.getStatus()).isEqualTo(UploadSessionStatus.VERIFIED);
+    }
+
+    @Test
+    void completeUploadRejectsMissingContentTypeBeforeCreatingProcessingJobs() {
+        Beat beat = Beat.builder()
+                .id("beat-1")
+                .producerId(1)
+                .status(BeatStatus.UPLOADING)
+                .visibility(BeatVisibility.PUBLIC)
+                .build();
+        UploadSession audioSession = uploadSession("session-a", UploadFileType.AUDIO, "audio/mpeg");
+        UploadSession coverSession = uploadSession("session-c", UploadFileType.COVER, "image/jpeg");
+
+        when(beatRepository.findById("beat-1")).thenReturn(Optional.of(beat));
+        when(uploadSessionRepository.findTopByBeatIdAndFileTypeOrderByCreatedAtDesc("beat-1", UploadFileType.AUDIO))
+                .thenReturn(Optional.of(audioSession));
+        when(uploadSessionRepository.findTopByBeatIdAndFileTypeOrderByCreatedAtDesc("beat-1", UploadFileType.COVER))
+                .thenReturn(Optional.of(coverSession));
+        when(presignedUrlService.objectMetadata(anyString(), anyString()))
+                .thenReturn(
+                        Optional.of(new StorageObjectMetadata(1024L, null, "etag-a", Instant.now())),
+                        Optional.of(new StorageObjectMetadata(2048L, "image/jpeg", "etag-c", Instant.now())));
+
+        assertThatThrownBy(() -> beatService.completeUpload(1, "beat-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("content type");
+        assertThat(audioSession.getStatus()).isEqualTo(UploadSessionStatus.PENDING);
+        assertThat(coverSession.getStatus()).isEqualTo(UploadSessionStatus.PENDING);
+        verify(mediaProcessingJobRepository, never()).save(any(MediaProcessingJob.class));
+    }
+
+    private UploadSession uploadSession(String id, UploadFileType fileType, String contentType) {
+        return UploadSession.builder()
+                .id(id)
+                .beatId("beat-1")
+                .producerId(1)
+                .bucket("studioos-media")
+                .objectKey("beats/uploads/" + id)
+                .fileType(fileType)
+                .contentType(contentType)
+                .status(UploadSessionStatus.PENDING)
+                .expiresAt(LocalDateTime.now().plusMinutes(10))
+                .build();
     }
 
     @Test

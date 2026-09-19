@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.studioos.server.beatmarketplace.dto.BeatLicenseResponse;
 import com.studioos.server.beatmarketplace.dto.CreateLicenseRequest;
 import com.studioos.server.beatmarketplace.dto.CreateLicensesRequest;
+import com.studioos.server.beatmarketplace.dto.UpdateLicenseRequest;
 import com.studioos.server.shared.enums.LicenseType;
 
 import lombok.RequiredArgsConstructor;
@@ -30,9 +31,37 @@ public class BeatLicenseService {
             throw new SecurityException("Producer does not own this beat");
         }
 
+        if (beatLicenseRepository.findByBeatIdAndActiveTrue(beatId).size() + request.getLicenses().size() > 1) {
+            throw new IllegalStateException("A beat can only have one active license; edit the existing license instead");
+        }
+
         return request.getLicenses().stream()
                 .map(req -> createSingleLicense(beat, req))
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public BeatLicenseResponse updateLicense(Integer producerId, String beatId, String licenseId, UpdateLicenseRequest request) {
+        Beat beat = beatRepository.findById(beatId)
+                .orElseThrow(() -> new IllegalArgumentException("Beat not found: " + beatId));
+        if (!beat.getProducerId().equals(producerId)) {
+            throw new SecurityException("Producer does not own this beat");
+        }
+        BeatLicense license = beatLicenseRepository.findByIdAndBeatIdAndActiveTrue(licenseId, beatId)
+                .orElseThrow(() -> new IllegalArgumentException("Active license not found: " + licenseId));
+        if (request.getType() == LicenseType.EXCLUSIVE && Boolean.TRUE.equals(beat.getExclusiveSold())) {
+            throw new IllegalStateException("This beat has already been sold exclusively");
+        }
+        license.setType(request.getType());
+        license.setPrice(request.getPrice());
+        license.setCommercialUse(request.isCommercialUse());
+        license.setMaxStreams(request.getMaxStreams());
+        license.setAllowMusicVideo(request.isAllowMusicVideo());
+        license.setAllowRadio(request.isAllowRadio());
+        license.setAllowTV(request.isAllowTV());
+        license.setAllowModification(request.isAllowModification());
+        license.setExclusive(request.getType() == LicenseType.EXCLUSIVE);
+        return toResponse(beatLicenseRepository.save(license));
     }
 
     private BeatLicenseResponse createSingleLicense(Beat beat, CreateLicenseRequest req) {

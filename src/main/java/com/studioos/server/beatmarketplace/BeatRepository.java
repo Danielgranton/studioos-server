@@ -18,5 +18,6 @@ public interface BeatRepository extends JpaRepository<Beat, String>, JpaSpecific
     long countByStatusAndVisibility(BeatStatus status, BeatVisibility visibility);
     List<Beat> findByGenreId(String genreId);
     boolean existsByStudioIdAndTitleIgnoreCase(String studioId, String title);
+    boolean existsByStudioIdAndTitleIgnoreCaseAndIdNot(String studioId, String title, String id);
     Optional<Beat> findTopByStudioIdAndTitleIgnoreCaseOrderByCreatedAtDesc(String studioId, String title);
 }

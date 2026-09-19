@@ -138,8 +138,9 @@ media:
   callback:
     grpc:
       enabled: ${MEDIA_CALLBACK_GRPC_ENABLED:true}
-      host: ${MEDIA_CALLBACK_GRPC_HOST:0.0.0.0}
+      host: ${MEDIA_CALLBACK_GRPC_HOST:127.0.0.1}
       port: ${MEDIA_CALLBACK_GRPC_PORT:50052}
+      allow-non-loopback: ${MEDIA_CALLBACK_GRPC_ALLOW_NON_LOOPBACK:false}
 
 storage:
   s3:

@@ -3,6 +3,7 @@ package com.studioos.server.beatmarketplace;
 import com.studioos.server.beatmarketplace.dto.BeatUploadCompleteResponse;
 import com.studioos.server.beatmarketplace.dto.BeatUploadSessionResponse;
 import com.studioos.server.beatmarketplace.dto.CreateBeatRequest;
+import com.studioos.server.beatmarketplace.dto.UpdateBeatRequest;
 import com.studioos.server.beatmarketplace.dto.RefreshUploadSessionResponse;
 import com.studioos.server.beatmarketplace.dto.BeatSaleResponse;
 import com.studioos.server.beatmarketplace.dto.BeatSummaryResponse;
@@ -37,6 +38,13 @@ public class BeatController {
         return beatGenreRepository.findAll(org.springframework.data.domain.Sort.by("name").ascending());
     }
 
+    @GetMapping("/{beatId}/processing")
+    public java.util.List<com.studioos.server.beatmarketplace.dto.BeatProcessingStatusResponse> getProcessingStatus(
+            @AuthenticationPrincipal User producer,
+            @PathVariable String beatId) {
+        return beatService.getProcessingStatus(producer.getId(), beatId);
+    }
+
     @PostMapping
     public BeatUploadSessionResponse createBeat(
             @AuthenticationPrincipal User producer,
@@ -49,6 +57,15 @@ public class BeatController {
             @AuthenticationPrincipal User producer,
             @PathVariable String beatId) {
         return beatService.completeUpload(producer.getId(), beatId);
+    }
+
+    @PutMapping("/{beatId}")
+    public ResponseEntity<Void> updateBeat(
+            @AuthenticationPrincipal User producer,
+            @PathVariable String beatId,
+            @Valid @RequestBody UpdateBeatRequest request) {
+        beatService.updateBeat(producer.getId(), beatId, request);
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{beatId}")
@@ -73,6 +90,14 @@ public class BeatController {
             @PathVariable String beatId) {
         beatService.deleteArchivedBeat(producer.getId(), beatId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{beatId}/processing/retry")
+    public ResponseEntity<Void> retryProcessing(
+            @AuthenticationPrincipal User producer,
+            @PathVariable String beatId) {
+        beatService.retryProcessing(producer.getId(), beatId);
+        return ResponseEntity.accepted().build();
     }
 
     @PostMapping("/{beatId}/upload-sessions/refresh")

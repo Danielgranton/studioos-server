@@ -28,6 +28,16 @@ public class BeatPlaybackController {
         return beatPlaybackService.getPreviewUrl(beatId, userId);
     }
 
+    @GetMapping("/{beatId}/owner-audio")
+    public BeatPreviewResponse getOwnerAudio(
+            @PathVariable String beatId,
+            @AuthenticationPrincipal User producer) {
+        if (producer == null) {
+            throw new SecurityException("You must be logged in to listen to your beat");
+        }
+        return beatPlaybackService.getOwnerAudioUrl(beatId, producer.getId());
+    }
+
     @GetMapping("/{beatId}/download")
     public BeatDownloadResponse getDownload(
         @PathVariable String beatId,

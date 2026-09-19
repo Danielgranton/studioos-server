@@ -53,8 +53,9 @@ Common environment variables:
 - `MEDIA_TLS_CLIENT_CERT_FILE` client certificate presented to the media service
 - `MEDIA_TLS_CLIENT_KEY_FILE` private key for the client certificate
 - `MEDIA_CALLBACK_GRPC_ENABLED` default: `true`
-- `MEDIA_CALLBACK_GRPC_HOST` default: `0.0.0.0`
+- `MEDIA_CALLBACK_GRPC_HOST` default: `127.0.0.1`
 - `MEDIA_CALLBACK_GRPC_PORT` default: `50052`
+- `MEDIA_CALLBACK_GRPC_ALLOW_NON_LOOPBACK` default: `false`; only enable this on a protected private network
 - `S3_ENABLED`
 - `AWS_REGION`
 - `AWS_ACCESS_KEY`
@@ -92,6 +93,10 @@ aws s3api put-bucket-cors \
   --region "$AWS_REGION" \
   --cors-configuration file://docker/s3-cors.json
 ```
+
+Add the deployed frontend origin to `docker/s3-cors.json` before applying it. The
+policy must allow `PUT`, `GET`, and `HEAD`, and the signed upload request's
+`Content-Type` header must remain allowed.
 
 If a migration was renamed, use a clean start so stale files are removed from `target/classes`:
 

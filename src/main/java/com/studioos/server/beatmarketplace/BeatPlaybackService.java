@@ -59,6 +59,28 @@ public class BeatPlaybackService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public BeatPreviewResponse getOwnerAudioUrl(String beatId, Integer producerId) {
+        Beat beat = beatRepository.findById(beatId)
+                .orElseThrow(() -> new IllegalArgumentException("Beat not found: " + beatId));
+
+        if (!beat.getProducerId().equals(producerId)) {
+            throw new SecurityException("Producer does not own this beat");
+        }
+        if (beat.getStatus() != BeatStatus.READY) {
+            throw new IllegalStateException("Beat is not ready for playback: " + beat.getStatus());
+        }
+        if (beat.getAudioUrl() == null || beat.getAudioUrl().isBlank()) {
+            throw new IllegalStateException("No full audio available for beat: " + beatId);
+        }
+
+        return BeatPreviewResponse.builder()
+                .beatId(beat.getId())
+                .previewUrl(presignedUrlService.generateDownloadUrl(mediaBucket, beat.getAudioUrl(), PREVIEW_URL_EXPIRY_SECONDS))
+                .expiresInSeconds(PREVIEW_URL_EXPIRY_SECONDS)
+                .build();
+    }
+
     private void recordPlay(Beat beat, Integer userId) {
         // NOTE: increments on every preview-URL request, not on confirmed listen completion.
         // A single real play may trigger multiple requests (signed URL expiry mid-listen,

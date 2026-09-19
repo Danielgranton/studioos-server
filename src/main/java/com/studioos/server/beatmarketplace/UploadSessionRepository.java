@@ -12,5 +12,7 @@ public interface UploadSessionRepository extends JpaRepository<UploadSession, St
     List<UploadSession> findByProducerId(Integer producerId);
     List<UploadSession> findByBeatId(String beatId);
     List<UploadSession> findByStatus(UploadSessionStatus status);
+    List<UploadSession> findByStatusInAndExpiresAtBefore(
+            List<UploadSessionStatus> statuses, java.time.LocalDateTime expiresAt);
     Optional<UploadSession> findTopByBeatIdAndFileTypeOrderByCreatedAtDesc(String beatId, UploadFileType fileType);
 }

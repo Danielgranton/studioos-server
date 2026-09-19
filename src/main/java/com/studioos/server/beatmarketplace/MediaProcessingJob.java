@@ -50,8 +50,14 @@ public class MediaProcessingJob {
     @Enumerated(EnumType.STRING)
     private MediaJobOperation operation;
 
-    @Column(nullable = false)
+    @Column
     private String externalJobId;   // jobId returned by the Media Service
+
+    @Column(columnDefinition = "TEXT")
+    private String assetReference;
+
+    @Column(columnDefinition = "TEXT")
+    private String parametersJson;
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
@@ -61,6 +67,10 @@ public class MediaProcessingJob {
 
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer attemptCount = 0;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)

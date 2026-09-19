@@ -6,12 +6,14 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.studioos.server.beatmarketplace.dto.BeatLicenseResponse;
 import com.studioos.server.beatmarketplace.dto.CreateLicensesRequest;
+import com.studioos.server.beatmarketplace.dto.UpdateLicenseRequest;
 import com.studioos.server.user.User;
 
 import jakarta.validation.Valid;
@@ -35,5 +37,14 @@ public class BeatLicenseController {
     @GetMapping("/{beatId}/licenses")
     public List<BeatLicenseResponse> getLicenses(@PathVariable String beatId) {
         return beatLicenseService.getLicensesForBeat(beatId);
+    }
+
+    @PutMapping("/{beatId}/licenses/{licenseId}")
+    public BeatLicenseResponse updateLicense(
+            @AuthenticationPrincipal User producer,
+            @PathVariable String beatId,
+            @PathVariable String licenseId,
+            @Valid @RequestBody UpdateLicenseRequest request) {
+        return beatLicenseService.updateLicense(producer.getId(), beatId, licenseId, request);
     }
 }

@@ -11,6 +11,7 @@ import com.studioos.server.shared.enums.MediaJobStatus;
 public interface MediaProcessingJobRepository extends JpaRepository<MediaProcessingJob, String> {
     List<MediaProcessingJob> findByBeatId(String beatId);
     List<MediaProcessingJob> findByStatus(MediaJobStatus status);
+    List<MediaProcessingJob> findByStatusIn(List<MediaJobStatus> statuses);
     List<MediaProcessingJob> findByStatusInAndUpdatedAtBefore(List<MediaJobStatus> statuses, LocalDateTime updatedAt);
     Optional<MediaProcessingJob> findByExternalJobId(String externalJobId);
 }

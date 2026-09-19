@@ -234,6 +234,7 @@ public class BeatBrowseService {
                 .description(beat.getDescription())
                 .mood(beat.getMood())
                 .studioId(beat.getStudioId())
+                .genreId(beat.getGenreId())
                 .coverUrl(resolveMediaUrl(beat.getCoverUrl()))
                 .thumbnailUrl(resolveMediaUrl(beat.getThumbnailUrl()))
                 .genreName(beat.getGenre() != null ? beat.getGenre().getName() : null)
