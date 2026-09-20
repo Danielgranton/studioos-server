@@ -47,6 +47,7 @@ import lombok.extern.slf4j.Slf4j;
 public class StudioServiceImpl {
 
     private final StudioRepository studioRepository;
+    private final StudioLikeRepository studioLikeRepository;
     private final StudioRatingRepository ratingRepository;
     private final BeatRepository beatRepository;
     private final BookingRepository bookingRepository;
@@ -307,6 +308,38 @@ public class StudioServiceImpl {
         log.info("Studio {} rated {} by user {}", studioId, request.getRating(), currentUser.getEmail());
     }
 
+    @Transactional(readOnly = true)
+    public com.studioos.server.studio.dto.StudioLikeStateResponse getLikeState(User currentUser, String studioId) {
+        ensureStudioExists(studioId);
+        boolean liked = currentUser != null
+                && studioLikeRepository.findByUserIdAndStudioId(currentUser.getId(), studioId).isPresent();
+        return com.studioos.server.studio.dto.StudioLikeStateResponse.builder()
+                .liked(liked)
+                .likeCount(studioLikeRepository.countByStudioId(studioId))
+                .build();
+    }
+
+    @Transactional
+    public com.studioos.server.studio.dto.StudioLikeStateResponse likeStudio(User currentUser, String studioId) {
+        if (currentUser == null) throw StudioosException.unauthorized("Authentication required");
+        ensureStudioExists(studioId);
+        studioLikeRepository.findByUserIdAndStudioId(currentUser.getId(), studioId)
+                .orElseGet(() -> studioLikeRepository.save(StudioLike.builder()
+                        .userId(currentUser.getId())
+                        .studioId(studioId)
+                        .build()));
+        return getLikeState(currentUser, studioId);
+    }
+
+    @Transactional
+    public com.studioos.server.studio.dto.StudioLikeStateResponse unlikeStudio(User currentUser, String studioId) {
+        if (currentUser == null) throw StudioosException.unauthorized("Authentication required");
+        ensureStudioExists(studioId);
+        studioLikeRepository.findByUserIdAndStudioId(currentUser.getId(), studioId)
+                .ifPresent(studioLikeRepository::delete);
+        return getLikeState(currentUser, studioId);
+    }
+
     // ─── Helpers ───
     private Studio findStudioAndVerifyOwner(String studioId, User currentUser) {
         Studio studio = studioRepository.findById(studioId)
@@ -317,6 +350,11 @@ public class StudioServiceImpl {
             throw StudioosException.forbidden("You do not own this studio");
         }
         return studio;
+    }
+
+    private Studio ensureStudioExists(String studioId) {
+        return studioRepository.findById(studioId)
+                .orElseThrow(() -> StudioosException.notFound("Studio not found"));
     }
 
     private void ensureStudioCanBeDeleted(String studioId) {
@@ -340,6 +378,7 @@ public class StudioServiceImpl {
     private StudioResponse toResponse(Studio studio) {
         Double avgRating = ratingRepository.findAverageRatingByStudioId(studio.getId());
         Long totalRatings = ratingRepository.countByStudioIdAndModerationStatus(studio.getId(), ReviewModerationStatus.ACTIVE);
+        Long likeCount = studioLikeRepository.countByStudioId(studio.getId());
 
         return StudioResponse.builder()
                 .id(studio.getId())
@@ -377,6 +416,7 @@ public class StudioServiceImpl {
                 .media(studioMediaService.getMedia(studio.getId()))
                 .averageRating(avgRating)
                 .totalRatings(totalRatings)
+                .likeCount(likeCount)
                 .popularityScore(popularityService.studioScore(studio.getId()))
                 .trendingScore(popularityService.studioTrendingScore(studio.getId()))
                 .featured(studio.isFeatured())

@@ -2,7 +2,9 @@ package com.studioos.server.studio;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -125,6 +127,12 @@ public class StudioMediaService {
         StudioMedia media = studioMediaRepository.findById(mediaId)
                 .filter(item -> studioId.equals(item.getStudioId()))
                 .orElseThrow(() -> StudioosException.notFound("Studio media not found"));
+        Stream.of(media.getStorageKey(), media.getOriginalUrl(), media.getLargeUrl(),
+                        media.getMediumUrl(), media.getThumbnailUrl())
+                .filter(Objects::nonNull)
+                .filter(reference -> !reference.isBlank())
+                .distinct()
+                .forEach(this::deleteReference);
         studioMediaRepository.delete(media);
     }
 
@@ -187,5 +195,19 @@ public class StudioMediaService {
         if (separator <= 0 || separator == remainder.length() - 1) return reference;
         return presignedUrlService.generateDownloadUrl(
                 remainder.substring(0, separator), remainder.substring(separator + 1), 3600);
+    }
+
+    private void deleteReference(String reference) {
+        if (reference.startsWith("s3://")) {
+            String remainder = reference.substring("s3://".length());
+            int separator = remainder.indexOf('/');
+            if (separator > 0 && separator < remainder.length() - 1) {
+                presignedUrlService.deleteObject(
+                        remainder.substring(0, separator),
+                        remainder.substring(separator + 1));
+            }
+            return;
+        }
+        presignedUrlService.deleteObject(mediaBucket, reference);
     }
 }

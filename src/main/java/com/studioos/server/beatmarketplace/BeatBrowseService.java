@@ -26,6 +26,7 @@ import com.studioos.server.beatmarketplace.dto.BeatSaleResponse;
 import com.studioos.server.beatmarketplace.dto.BeatSummaryResponse;
 import com.studioos.server.user.UserRepository;
 import com.studioos.server.shared.storage.PresignedUrlService;
+import com.studioos.server.shared.enums.LicenseType;
 
 import lombok.RequiredArgsConstructor;
 
@@ -80,10 +81,11 @@ public class BeatBrowseService {
         Map<Integer, String> producerNames = resolveProducerNames(beats.getContent());
         Map<Integer, ProducerVerification> producerVerification = resolveProducerVerification(beats.getContent());
         Set<String> exclusiveBeatIds = resolveExclusiveBeatIds(beatIds);
+        Map<String, LicenseType> licenseTypes = resolveLicenseTypes(beatIds);
         Map<String, BeatRating> ratings = resolveRatings(beatIds);
 
         return beats.map(beat -> toSummary(beat, minPrices.get(beat.getId()), producerNames.get(beat.getProducerId()),
-                producerVerification.get(beat.getProducerId()), exclusiveBeatIds.contains(beat.getId()), ratings.get(beat.getId())));
+                producerVerification.get(beat.getProducerId()), exclusiveBeatIds.contains(beat.getId()), licenseTypes.get(beat.getId()), ratings.get(beat.getId())));
     }
 
     @Transactional(readOnly = true)
@@ -95,10 +97,11 @@ public class BeatBrowseService {
         Map<Integer, String> producerNames = resolveProducerNames(beats);
         Map<Integer, ProducerVerification> verification = resolveProducerVerification(beats);
         Set<String> exclusiveBeatIds = resolveExclusiveBeatIds(beatIds);
+        Map<String, LicenseType> licenseTypes = resolveLicenseTypes(beatIds);
         Map<String, BeatRating> ratings = resolveRatings(beatIds);
 
         return beats.stream().map(beat -> toSummary(beat, minPrices.get(beat.getId()), producerNames.get(producerId),
-                verification.get(producerId), exclusiveBeatIds.contains(beat.getId()), ratings.get(beat.getId()))).toList();
+                verification.get(producerId), exclusiveBeatIds.contains(beat.getId()), licenseTypes.get(beat.getId()), ratings.get(beat.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -157,11 +160,12 @@ public class BeatBrowseService {
         Map<Integer, String> producerNames = resolveProducerNames(content);
         Map<Integer, ProducerVerification> producerVerification = resolveProducerVerification(content);
         Set<String> exclusiveBeatIds = resolveExclusiveBeatIds(pageBeatIds);
+        Map<String, LicenseType> licenseTypes = resolveLicenseTypes(pageBeatIds);
         Map<String, BeatRating> ratings = resolveRatings(pageBeatIds);
 
         return new PageImpl<>(
                 content.stream().map(beat -> toSummary(beat, minPrices.get(beat.getId()), producerNames.get(beat.getProducerId()),
-                        producerVerification.get(beat.getProducerId()), exclusiveBeatIds.contains(beat.getId()), ratings.get(beat.getId()))).toList(),
+                        producerVerification.get(beat.getProducerId()), exclusiveBeatIds.contains(beat.getId()), licenseTypes.get(beat.getId()), ratings.get(beat.getId()))).toList(),
                 PageRequest.of(page, size),
                 sorted.size());
     }
@@ -178,6 +182,13 @@ public class BeatBrowseService {
         }
 
         return scores;
+    }
+
+    private Map<String, LicenseType> resolveLicenseTypes(List<String> beatIds) {
+        if (beatIds.isEmpty()) return Map.of();
+        return beatLicenseRepository.findByBeatIdInAndActiveTrue(beatIds).stream()
+                .collect(Collectors.toMap(BeatLicense::getBeatId, BeatLicense::getType,
+                        (first, second) -> second == LicenseType.EXCLUSIVE ? second : first));
     }
 
     private Map<Integer, String> resolveProducerNames(List<Beat> beats) {
@@ -227,6 +238,7 @@ public class BeatBrowseService {
 
     private BeatSummaryResponse toSummary(Beat beat, Integer startingPrice, String producerName,
                                            ProducerVerification producerVerification, boolean exclusive,
+                                           LicenseType licenseType,
                                            BeatRating rating) {
         return BeatSummaryResponse.builder()
                 .id(beat.getId())
@@ -241,6 +253,7 @@ public class BeatBrowseService {
                 .bpm(beat.getBpm())
                 .keySignature(beat.getKeySignature())
                 .startingPrice(startingPrice)
+                .licenseType(licenseType)
                 .likeCount(beat.getLikeCount())
                 .playCount(beat.getPlayCount())
                 .averageRating(rating != null ? rating.average() : null)

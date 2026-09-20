@@ -1,6 +1,7 @@
 package com.studioos.server.beatmarketplace.dto;
 
 import com.studioos.server.shared.enums.VerificationStatus;
+import com.studioos.server.shared.enums.LicenseType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,6 +22,7 @@ public class BeatSummaryResponse {
     private Integer bpm;
     private String keySignature;
     private Integer startingPrice;   // cheapest active license price, null if no licenses yet
+    private LicenseType licenseType;
     private Integer likeCount;
     private Integer playCount;
     private Double averageRating;

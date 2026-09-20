@@ -45,6 +45,7 @@ public class BeatService {
     private static final int UPLOAD_URL_EXPIRY_SECONDS = 900; // 15 minutes
     private static final int MIN_BPM = 40;
     private static final int MAX_BPM = 300;
+    private static final int PUBLIC_PREVIEW_SECONDS = 70;
     private static final long MAX_AUDIO_BYTES = 200L * 1024L * 1024L;
     private static final long MAX_COVER_BYTES = 10L * 1024L * 1024L;
 
@@ -360,7 +361,9 @@ public class BeatService {
                     previous.getAssetReference() == null
                             ? (previous.getOperation().name().startsWith("AUDIO_") ? audioReference : coverReference)
                             : previous.getAssetReference(),
-                    previous.getParametersJson() == null
+                    previous.getOperation() == MediaJobOperation.AUDIO_PREVIEW
+                            ? defaultParameters(MediaJobOperation.AUDIO_PREVIEW)
+                            : previous.getParametersJson() == null
                             ? defaultParameters(previous.getOperation())
                             : previous.getParametersJson()));
         }
@@ -502,8 +505,7 @@ public class BeatService {
         String audioReference = mediaReference(audioSession.getBucket(), audioSession.getObjectKey());
         String coverReference = mediaReference(coverSession.getBucket(), coverSession.getObjectKey());
         createJob(beat.getId(), MediaJobOperation.AUDIO_NORMALIZE, audioReference, "{}");
-        createJob(beat.getId(), MediaJobOperation.AUDIO_PREVIEW, audioReference,
-                "{\"start\":\"00:00:00\",\"end\":\"00:00:30\"}");
+        createJob(beat.getId(), MediaJobOperation.AUDIO_PREVIEW, audioReference, previewParameters());
         createJob(beat.getId(), MediaJobOperation.AUDIO_WAVEFORM, audioReference, "{}");
         createJob(beat.getId(), MediaJobOperation.COVER_RESIZE, coverReference,
                 "{\"width\":1000,\"height\":1000}");
@@ -532,10 +534,17 @@ public class BeatService {
 
     private String defaultParameters(MediaJobOperation operation) {
         return switch (operation) {
-            case AUDIO_PREVIEW -> "{\"start\":\"00:00:00\",\"end\":\"00:00:30\"}";
+            case AUDIO_PREVIEW -> previewParameters();
             case COVER_RESIZE -> "{\"width\":1000,\"height\":1000}";
             default -> "{}";
         };
+    }
+
+    private String previewParameters() {
+        return String.format(
+                "{\"start\":\"00:00:00\",\"end\":\"00:%02d:%02d\"}",
+                PUBLIC_PREVIEW_SECONDS / 60,
+                PUBLIC_PREVIEW_SECONDS % 60);
     }
 
     void failBeat(String beatId) {

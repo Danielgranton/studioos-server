@@ -44,6 +44,7 @@ public class StudioResponse {
     private List<StudioMediaResponse> media;
     private Double averageRating;
     private Long totalRatings;
+    private Long likeCount;
     private Double popularityScore;
     private Double trendingScore;
     private boolean featured;

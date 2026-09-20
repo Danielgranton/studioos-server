@@ -168,4 +168,28 @@ public class StudioController {
         studioService.rateStudio(currentUser, studioId, request);
         return ResponseEntity.ok(ApiResponse.success("Studio rated successfully"));
     }
+
+    @GetMapping("/{studioId}/like")
+    public ResponseEntity<ApiResponse<StudioLikeStateResponse>> getLikeState(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable String studioId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(studioService.getLikeState(currentUser, studioId)));
+    }
+
+    @PostMapping("/{studioId}/like")
+    public ResponseEntity<ApiResponse<StudioLikeStateResponse>> likeStudio(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable String studioId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(studioService.likeStudio(currentUser, studioId)));
+    }
+
+    @DeleteMapping("/{studioId}/like")
+    public ResponseEntity<ApiResponse<StudioLikeStateResponse>> unlikeStudio(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable String studioId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(studioService.unlikeStudio(currentUser, studioId)));
+    }
 }
