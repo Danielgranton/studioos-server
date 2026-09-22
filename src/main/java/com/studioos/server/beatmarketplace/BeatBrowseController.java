@@ -3,6 +3,7 @@ package com.studioos.server.beatmarketplace;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,5 +27,10 @@ public class BeatBrowseController {
     @GetMapping("/search")
     public Page<BeatSummaryResponse> search(@ModelAttribute BeatSearchRequest request) {
         return beatBrowseService.search(request);
+    }
+
+    @GetMapping("/{beatId}")
+    public BeatSummaryResponse getPublicBeat(@PathVariable String beatId) {
+        return beatBrowseService.getPublicBeat(beatId);
     }
 }

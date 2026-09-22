@@ -27,6 +27,7 @@ import com.studioos.server.beatmarketplace.dto.BeatSummaryResponse;
 import com.studioos.server.user.UserRepository;
 import com.studioos.server.shared.storage.PresignedUrlService;
 import com.studioos.server.shared.enums.LicenseType;
+import com.studioos.server.shared.exceptions.StudioosException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -119,6 +120,28 @@ public class BeatBrowseService {
                         .purchasedAt(sale.getPurchasedAt())
                         .build())
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public BeatSummaryResponse getPublicBeat(String beatId) {
+        Beat beat = beatRepository.findOne(BeatSpecifications.publicAndReady()
+                        .and((root, query, cb) -> cb.equal(root.get("id"), beatId)))
+                .orElseThrow(() -> StudioosException.notFound("Beat not found"));
+
+        List<String> beatIds = List.of(beat.getId());
+        Integer startingPrice = beatLicenseRepository.findMinPricesByBeatIds(beatIds).stream()
+                .findFirst()
+                .map(BeatMinPriceProjection::getMinPrice)
+                .orElse(null);
+
+        return toSummary(
+                beat,
+                startingPrice,
+                resolveProducerNames(List.of(beat)).get(beat.getProducerId()),
+                resolveProducerVerification(List.of(beat)).get(beat.getProducerId()),
+                resolveExclusiveBeatIds(beatIds).contains(beat.getId()),
+                resolveLicenseTypes(beatIds).get(beat.getId()),
+                resolveRatings(beatIds).get(beat.getId()));
     }
 
     private Sort resolveSort(String sortBy) {
