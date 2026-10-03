@@ -13,6 +13,8 @@ public class ArtistServiceOfferingRequest {
     @Size(max = 120, message = "Service name must not exceed 120 characters")
     private String name;
 
+    private String catalogServiceId;
+
     @Size(max = 500, message = "Description must not exceed 500 characters")
     private String description;
 

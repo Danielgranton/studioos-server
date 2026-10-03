@@ -11,6 +11,7 @@ public class ArtistServiceOfferingResponse {
     String id;
     Integer artistId;
     String name;
+    String catalogServiceId;
     String description;
     Integer price;
     String currency;

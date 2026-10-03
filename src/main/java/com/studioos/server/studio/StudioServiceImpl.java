@@ -37,6 +37,8 @@ import com.studioos.server.studio.dto.RateStudioRequest;
 import com.studioos.server.studio.dto.StudioResponse;
 import com.studioos.server.studio.dto.UpdateStudioRequest;
 import com.studioos.server.user.User;
+import com.studioos.server.servicecatalog.ServiceCatalog;
+import com.studioos.server.servicecatalog.ServiceCatalogService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +62,7 @@ public class StudioServiceImpl {
     private final PresignedUrlService presignedUrlService;
     private final StudioMediaService studioMediaService;
     private final PopularityService popularityService;
+    private final ServiceCatalogService serviceCatalogService;
 
     @org.springframework.beans.factory.annotation.Value("${storage.s3.profile-url-expiry-seconds:3600}")
     private int profileUrlExpirySeconds;
@@ -98,6 +101,7 @@ public class StudioServiceImpl {
                 List<StudioService> services = request.getServices().stream()
                         .map(name -> StudioService.builder()
                                 .name(name)
+                                .catalogServiceId(resolveCatalogServiceId(name))
                                 .studioId(studio.getId()) // ← now has real ID
                                 .studio(studio)
                                 .build())
@@ -141,6 +145,7 @@ public class StudioServiceImpl {
             List<StudioService> services = request.getServices().stream()
                     .map(name -> StudioService.builder()
                             .name(name)
+                            .catalogServiceId(resolveCatalogServiceId(name))
                             .studioId(studio.getId())
                             .studio(studio)
                             .build())
@@ -152,6 +157,10 @@ public class StudioServiceImpl {
         log.info("Studio updated: {}", studioId);
         applicationEventPublisher.publishEvent(new StudioUpdatedEvent(studio.getId()));
         return toResponse(studio);
+    }
+
+    private String resolveCatalogServiceId(String name) {
+        return serviceCatalogService.findByName(name).map(ServiceCatalog::getId).orElse(null);
     }
 
     // ─── Upload studio image ───

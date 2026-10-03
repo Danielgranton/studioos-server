@@ -11,6 +11,8 @@ import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.user.User;
 import com.studioos.server.user.UserRepository;
+import com.studioos.server.servicecatalog.ServiceCatalog;
+import com.studioos.server.servicecatalog.ServiceCatalogService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -20,6 +22,7 @@ public class ArtistServiceOfferingService {
 
     private final ArtistServiceOfferingRepository offeringRepository;
     private final UserRepository userRepository;
+    private final ServiceCatalogService catalogService;
 
     @Transactional(readOnly = true)
     public List<ArtistServiceOfferingResponse> getPublicServices(Integer artistId) {
@@ -40,6 +43,7 @@ public class ArtistServiceOfferingService {
         ArtistServiceOffering offering = ArtistServiceOffering.builder()
                 .artistId(currentUser.getId())
                 .name(request.getName().trim())
+                .catalogServiceId(resolveCatalogService(currentUser, request.getCatalogServiceId()))
                 .description(trimToNull(request.getDescription()))
                 .price(request.getPrice())
                 .currency(normalizeCurrency(request.getCurrency()))
@@ -55,6 +59,7 @@ public class ArtistServiceOfferingService {
                 .orElseThrow(() -> StudioosException.notFound("Artist service not found"));
 
         offering.setName(request.getName().trim());
+        offering.setCatalogServiceId(resolveCatalogService(currentUser, request.getCatalogServiceId()));
         offering.setDescription(trimToNull(request.getDescription()));
         offering.setPrice(request.getPrice());
         offering.setCurrency(normalizeCurrency(request.getCurrency()));
@@ -82,6 +87,13 @@ public class ArtistServiceOfferingService {
         return currency == null || currency.isBlank() ? "KES" : currency.trim().toUpperCase();
     }
 
+    private String resolveCatalogService(User currentUser, String catalogServiceId) {
+        if (catalogServiceId == null || catalogServiceId.isBlank()) return null;
+        ServiceCatalog service = catalogService.getActive(catalogServiceId);
+        if (!service.isArtistAllowed()) throw StudioosException.forbidden("Artists cannot offer this service");
+        return service.getId();
+    }
+
     private String trimToNull(String value) {
         if (value == null || value.isBlank()) return null;
         return value.trim();
@@ -92,6 +104,7 @@ public class ArtistServiceOfferingService {
                 .id(offering.getId())
                 .artistId(offering.getArtistId())
                 .name(offering.getName())
+                .catalogServiceId(offering.getCatalogServiceId())
                 .description(offering.getDescription())
                 .price(offering.getPrice())
                 .currency(offering.getCurrency())

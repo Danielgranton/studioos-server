@@ -1,10 +1,6 @@
-package com.studioos.server.artist;
+package com.studioos.server.servicecatalog;
 
 import java.time.LocalDateTime;
-
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -17,42 +13,48 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
-@Table(name = "artist_service_offerings")
+@Table(name = "service_catalog")
 @EntityListeners(AuditingEntityListener.class)
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ArtistServiceOffering {
-
+public class ServiceCatalog {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @Column(name = "artist_id", nullable = false)
-    private Integer artistId;
+    @Column(nullable = false, unique = true, length = 140)
+    private String slug;
 
-    @Column(nullable = false, length = 120)
+    @Column(nullable = false, unique = true, length = 140)
     private String name;
 
-    @Column(name = "catalog_service_id")
-    private String catalogServiceId;
+    @Column(nullable = false, length = 80)
+    private String category;
 
     @Column(length = 500)
     private String description;
 
-    @Column(nullable = false)
-    private Integer price;
-
-    @Column(nullable = false, length = 3)
+    @Column(name = "artist_allowed", nullable = false)
     @Builder.Default
-    private String currency = "KES";
+    private boolean artistAllowed = true;
+
+    @Column(name = "studio_allowed", nullable = false)
+    @Builder.Default
+    private boolean studioAllowed = true;
 
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    @Column(name = "created_by")
+    private Integer createdBy;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)

@@ -9,4 +9,5 @@ public interface ArtistServiceOfferingRepository extends JpaRepository<ArtistSer
     List<ArtistServiceOffering> findByArtistIdAndActiveTrueOrderByCreatedAtDesc(Integer artistId);
     List<ArtistServiceOffering> findByArtistIdOrderByCreatedAtDesc(Integer artistId);
     Optional<ArtistServiceOffering> findByIdAndArtistId(String id, Integer artistId);
+    List<ArtistServiceOffering> findByCatalogServiceIdAndActiveTrueOrderByCreatedAtDesc(String catalogServiceId);
 }

@@ -29,6 +29,9 @@ public class StudioService {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "catalog_service_id")
+    private String catalogServiceId;
+
     @Column(nullable = false)
     private String studioId;
 
