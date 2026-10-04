@@ -37,6 +37,8 @@ public interface StudioRepository extends JpaRepository<Studio, String>, JpaSpec
     @Query("SELECT DISTINCT s FROM Studio s JOIN s.services service WHERE LOWER(service.name) LIKE LOWER(CONCAT('%', :service, '%'))")
     Page<Studio> findByService(String service, Pageable pageable);
 
-    @Query("SELECT DISTINCT s FROM Studio s JOIN s.services service WHERE service.catalogServiceId = :catalogServiceId AND s.available = true")
-    List<Studio> findAvailableByCatalogServiceId(@Param("catalogServiceId") String catalogServiceId);
+    @Query("SELECT DISTINCT s FROM Studio s JOIN s.services service WHERE s.available = true AND (service.catalogServiceId = :catalogServiceId OR LOWER(TRIM(service.name)) IN :serviceNames)")
+    List<Studio> findAvailableByCatalogServiceIdOrName(
+            @Param("catalogServiceId") String catalogServiceId,
+            @Param("serviceNames") List<String> serviceNames);
 }
