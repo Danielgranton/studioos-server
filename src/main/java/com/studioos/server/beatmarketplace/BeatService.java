@@ -72,6 +72,7 @@ public class BeatService {
                 .map(job -> BeatProcessingStatusResponse.builder()
                         .operation(job.getOperation())
                         .status(job.getStatus())
+                        .progressPercent(job.getProgressPercent())
                         .errorMessage(job.getErrorMessage())
                         .updatedAt(job.getUpdatedAt())
                         .build())
@@ -455,6 +456,7 @@ public class BeatService {
                 .resultReference(callback.getResultReference())
                 .errorMessage(callback.getErrorMessage())
                 .durationSeconds(callback.getDurationSeconds())
+                .progressPercent(callback.getProgressPercent())
                 .build();
         applyMediaJobResult(result);
     }
@@ -474,6 +476,12 @@ public class BeatService {
 
         MediaJobStatus nextStatus = result.getStatus() == null ? MediaJobStatus.QUEUED : result.getStatus();
         job.setStatus(nextStatus);
+        if (result.getProgressPercent() != null) {
+            job.setProgressPercent(Math.max(0, Math.min(100, result.getProgressPercent())));
+        }
+        if (nextStatus == MediaJobStatus.SUCCESS) {
+            job.setProgressPercent(100);
+        }
         job.setResultReference(result.getResultReference());
         job.setErrorMessage(result.getErrorMessage());
         mediaProcessingJobRepository.save(job);

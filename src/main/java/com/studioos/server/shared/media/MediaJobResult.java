@@ -20,4 +20,5 @@ public class MediaJobResult {
     private long createdAtUnixMs;
     private long updatedAtUnixMs;
     private Integer durationSeconds;
+    private Integer progressPercent;
 }

@@ -70,6 +70,10 @@ public class MediaProcessingJob {
 
     @Builder.Default
     @Column(nullable = false)
+    private Integer progressPercent = 0;
+
+    @Builder.Default
+    @Column(nullable = false)
     private Integer attemptCount = 0;
 
     @CreatedDate

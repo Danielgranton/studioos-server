@@ -63,6 +63,7 @@ public class MediaJobOrchestratorService {
                 .resultReference(request.getResultReference())
                 .errorMessage(request.getErrorMessage())
                 .durationSeconds(request.getDurationSeconds())
+                .progressPercent(request.getProgressPercent())
                 .build();
 
         dispatchResult(result);

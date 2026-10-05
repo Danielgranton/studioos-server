@@ -11,6 +11,7 @@ import lombok.Builder;
 public record BeatProcessingStatusResponse(
         MediaJobOperation operation,
         MediaJobStatus status,
+        Integer progressPercent,
         String errorMessage,
         LocalDateTime updatedAt) {
 }

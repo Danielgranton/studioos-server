@@ -128,6 +128,7 @@ public class GrpcMediaProcessingClient implements MediaProcessingClient {
                 .createdAtUnixMs(response.getCreatedAtUnixMs())
                 .updatedAtUnixMs(response.getUpdatedAtUnixMs())
                 .durationSeconds(response.getDurationSeconds() > 0 ? response.getDurationSeconds() : null)
+                .progressPercent(response.getProgressPercent())
                 .build();
     }
 
