@@ -53,6 +53,13 @@ public class BookingServiceImpl {
         Studio studio = studioRepository.findById(request.getStudioId())
                 .orElseThrow(() -> StudioosException.notFound("Studio not found"));
 
+        if (!studio.isAvailable()) {
+            throw StudioosException.badRequest("This studio is not currently accepting bookings");
+        }
+        if (!request.getSessionDate().isAfter(LocalDateTime.now())) {
+            throw StudioosException.badRequest("Session date must be in the future");
+        }
+
         LocalDateTime endDate = request.getSessionDate().plusHours(request.getDurationHours());
         List<Booking> conflicts = bookingRepository.findConflictingBookings(
                 request.getStudioId(),
@@ -109,6 +116,10 @@ public class BookingServiceImpl {
 
         if (booking.getStatus() != BookingStatus.PENDING) {
             throw StudioosException.badRequest("Only pending bookings can be confirmed");
+        }
+
+        if (!booking.getSessionDate().isAfter(LocalDateTime.now())) {
+            throw StudioosException.badRequest("The requested session time has already passed");
         }
 
         booking.setStatus(BookingStatus.APPROVED);

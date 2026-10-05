@@ -29,8 +29,8 @@ public class BookingExpiryScheduler {
     @Transactional
     public void expireUnpaidBookings() {
         LocalDateTime cutoff = LocalDateTime.now().minusMinutes(EXPIRY_MINUTES);
-        List<Booking> expired = bookingRepository.findByStatusAndPaymentStatusAndCreatedAtBefore(
-                BookingStatus.PENDING,
+        List<Booking> expired = bookingRepository.findByStatusAndPaymentStatusAndUpdatedAtBefore(
+                BookingStatus.APPROVED,
                 BookingPaymentStatus.BOOKED,
                 cutoff);
 

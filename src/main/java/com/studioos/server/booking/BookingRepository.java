@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -17,21 +18,25 @@ import com.studioos.server.shared.enums.BookingStatus;
 public interface BookingRepository extends JpaRepository<Booking, String> {
 
     // Find by studio owner
+    @EntityGraph(attributePaths = "artist")
     Page<Booking> findByStudioId(String studioId, Pageable pageable);
     boolean existsByStudioId(String studioId);
 
     // Find by artist
+    @EntityGraph(attributePaths = "artist")
     Page<Booking> findByArtistId(Integer artistId, Pageable pageable);
 
     // Find bookings for a studio within a date range (for availability check)
-    @Query("SELECT b FROM Booking b WHERE b.studioId = :studioId AND b.status != 'CANCELLED' " +
-           "AND b.sessionDate >= :startDate AND b.sessionDate < :endDate")
+    @Query(value = "SELECT * FROM bookings b WHERE b.studio_id = :studioId " +
+           "AND b.status NOT IN ('CANCELLED', 'EXPIRED') " +
+           "AND b.session_date < :endDate " +
+           "AND b.session_date + (b.duration_hours * INTERVAL '1 hour') > :startDate", nativeQuery = true)
     List<Booking> findConflictingBookings(String studioId, LocalDateTime startDate, LocalDateTime endDate);
 
     // Find pending bookings (awaiting confirmation)
     List<Booking> findByStudioIdAndStatus(String studioId, BookingStatus status);
 
-    List<Booking> findByStatusAndPaymentStatusAndCreatedAtBefore(BookingStatus status, BookingPaymentStatus paymentStatus, LocalDateTime createdAtBefore);
+    List<Booking> findByStatusAndPaymentStatusAndUpdatedAtBefore(BookingStatus status, BookingPaymentStatus paymentStatus, LocalDateTime updatedAtBefore);
 
     Optional<Booking> findByIdAndStudioId(String bookingId, String studioId);
 
