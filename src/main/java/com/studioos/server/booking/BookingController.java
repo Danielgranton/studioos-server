@@ -20,6 +20,7 @@ import com.studioos.server.shared.dto.PageResponse;
 import com.studioos.server.user.User;
 import com.studioos.server.booking.dto.InitiatePaymentRequest;
 import com.studioos.server.booking.dto.PaymentInitiationResponse;
+import com.studioos.server.booking.dto.UpdateBookingRequest;
 
 
 import jakarta.validation.Valid;
@@ -41,6 +42,16 @@ public class BookingController {
         BookingResponse response = bookingService.createBooking(currentUser, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Booking created successfully", response));
+    }
+
+    @PatchMapping("/{bookingId}")
+    public ResponseEntity<ApiResponse<BookingResponse>> updateArtistBooking(
+            @AuthenticationPrincipal User currentUser,
+            @PathVariable String bookingId,
+            @Valid @RequestBody UpdateBookingRequest request
+    ) {
+        BookingResponse response = bookingService.updateArtistBooking(currentUser, bookingId, request);
+        return ResponseEntity.ok(ApiResponse.success("Booking updated successfully", response));
     }
 
     // booking payment

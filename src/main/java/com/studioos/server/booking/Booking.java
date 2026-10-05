@@ -65,6 +65,10 @@ public class Booking {
 
     private Integer totalPrice;
 
+    @Column(name = "attempt_count", nullable = false)
+    @Builder.Default
+    private Integer attemptCount = 1;
+
     // ─── Foreign keys ───
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "studioId", insertable = false, updatable = false)

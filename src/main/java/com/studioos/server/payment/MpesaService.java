@@ -1,6 +1,7 @@
 package com.studioos.server.payment;
 
 import java.nio.charset.StandardCharsets;
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
@@ -67,6 +68,12 @@ public class MpesaService {
 
     // ─── C2B: STK Push ───
     public StkPushInitiationResult initiateStkPush(String phoneNumber, int amount, String transactionId) {
+        String callbackProblem = callbackUrlProblem(mpesaProperties.getCallbackUrl(), "MPESA_CALLBACK_URL");
+        if (callbackProblem != null) {
+            log.error("Cannot initiate STK Push for transaction {}: {}", transactionId, callbackProblem);
+            return new StkPushInitiationResult(false, null, null, callbackProblem);
+        }
+
         String token = getAccessToken();
         String ts = timestamp();
 
@@ -149,6 +156,15 @@ public class MpesaService {
                     "B2C is not configured: MPESA_INITIATOR_NAME and MPESA_SECURITY_CREDENTIAL must be set");
         }
 
+        String callbackProblem = callbackUrlProblem(mpesaProperties.getCallbackUrl(), "MPESA_CALLBACK_URL");
+        if (callbackProblem == null) {
+            callbackProblem = callbackUrlProblem(mpesaProperties.getTimeoutUrl(), "MPESA_TIMEOUT_URL");
+        }
+        if (callbackProblem != null) {
+            log.error("Cannot initiate B2C payout for withdrawal {}: {}", withdrawalId, callbackProblem);
+            return new B2cInitiationResult(false, null, null, callbackProblem);
+        }
+
         String token = getAccessToken();
 
         Map<String, Object> body = new HashMap<>();
@@ -184,6 +200,45 @@ public class MpesaService {
             log.error("B2C payout failed for withdrawal {}: {}", withdrawalId, e.getMessage());
             return new B2cInitiationResult(false, null, null, e.getMessage());
         }
+    }
+
+    static String callbackUrlProblem(String value, String settingName) {
+        if (value == null || value.isBlank()) {
+            return settingName + " must be configured as a public HTTPS URL";
+        }
+
+        try {
+            URI uri = URI.create(value.trim());
+            String host = uri.getHost();
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || host == null || uri.getRawUserInfo() != null
+                    || uri.getPort() != -1 && uri.getPort() != 443 || isLocalHost(host)) {
+                return settingName + " must be a public HTTPS URL reachable by Safaricom; localhost and private-network URLs are not accepted";
+            }
+        } catch (IllegalArgumentException exception) {
+            return settingName + " is not a valid HTTPS URL";
+        }
+        return null;
+    }
+
+    private static boolean isLocalHost(String hostValue) {
+        String host = hostValue.toLowerCase();
+        if (host.startsWith("[") && host.endsWith("]")) {
+            host = host.substring(1, host.length() - 1);
+        }
+        if (host.equals("localhost") || host.endsWith(".localhost") || host.endsWith(".local")
+                || host.equals("::1") || host.equals("0:0:0:0:0:0:0:1") || host.startsWith("fc")
+                || host.startsWith("fd") || host.startsWith("fe80:")) {
+            return true;
+        }
+        if (!host.matches("\\d{1,3}(\\.\\d{1,3}){3}")) {
+            return false;
+        }
+        String[] octets = host.split("\\.");
+        int first = Integer.parseInt(octets[0]);
+        int second = Integer.parseInt(octets[1]);
+        return first == 0 || first == 10 || first == 127 || first == 169 && second == 254
+                || first == 172 && second >= 16 && second <= 31
+                || first == 192 && second == 168;
     }
 
     // ─── B2C callback parsing ───

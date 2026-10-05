@@ -76,6 +76,15 @@ export $(cat .env | xargs)
 
 The API runs at `http://localhost:8080/api/v1` by default.
 
+Daraja cannot call a `localhost` callback. For local M-Pesa testing, expose port `8080` through a public HTTPS tunnel, then set `MPESA_CALLBACK_URL` and `MPESA_TIMEOUT_URL` to the tunnel host with these paths:
+
+```text
+https://<public-tunnel-host>/api/v1/payment/mpesa/callback
+https://<public-tunnel-host>/api/v1/payment/mpesa/timeout
+```
+
+The `/api/v1` prefix is required because it is the configured servlet context path. Restart the server after changing these environment variables.
+
 ## Run with gRPC media enabled
 
 The production path uses the real gRPC client in the `grpc-enabled` profile.

@@ -22,6 +22,7 @@ public class BookingResponse {
     private String artistName;
     private LocalDateTime sessionDate;
     private Integer durationHours;
+    private Integer attemptCount;
     private Integer totalPrice;
     private BookingStatus status;
     private BookingPaymentStatus paymentStatus;

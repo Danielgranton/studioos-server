@@ -29,6 +29,7 @@ public class PaymentService {
 
     @Transactional
     public Transaction initiateBookingPayment(Integer requesterId, String bookingId, String phoneNumber) {
+        String normalizedPhone = MpesaPhoneNumber.normalize(phoneNumber);
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found: " + bookingId));
 
@@ -55,13 +56,13 @@ public class PaymentService {
                         .bookingId(booking.getId())
                         .studioId(booking.getStudioId())
                         .userId(booking.getArtistId())
-                        .mpesaPhoneNumber(phoneNumber)
+                        .mpesaPhoneNumber(normalizedPhone)
                         .description("Booking payment for " + booking.getId())
                         .build()
         );
 
         StkPushInitiationResult stkResult = mpesaService.initiateStkPush(
-                phoneNumber, booking.getTotalPrice(), transaction.getId());
+                normalizedPhone, booking.getTotalPrice(), transaction.getId());
 
         if (!stkResult.isAccepted()) {
             transaction.setStatus(TransactionStatus.FAILED);
@@ -137,6 +138,7 @@ public class PaymentService {
     @Transactional
     public Transaction initiateBeatPurchasePayment(Integer buyerId, String studioId, Integer amount,
                                                     String phoneNumber, String description) {
+        String normalizedPhone = MpesaPhoneNumber.normalize(phoneNumber);
 
         Transaction transaction = transactionRepository.save(
                 Transaction.builder()
@@ -145,12 +147,12 @@ public class PaymentService {
                     .amount(amount)
                     .studioId(studioId)
                     .userId(buyerId)
-                    .mpesaPhoneNumber(phoneNumber)
+                    .mpesaPhoneNumber(normalizedPhone)
                     .description(description)
                     .build()
         );
 
-        StkPushInitiationResult stkResult = mpesaService.initiateStkPush(phoneNumber, amount, transaction.getId());
+        StkPushInitiationResult stkResult = mpesaService.initiateStkPush(normalizedPhone, amount, transaction.getId());
 
         if (!stkResult.isAccepted()) {
             transaction.setStatus(TransactionStatus.FAILED);
@@ -170,6 +172,7 @@ public class PaymentService {
     @Transactional
     public Transaction initiateAdCampaignPayment(Integer advertiserId, String studioId, Integer amount,
                                                 String phoneNumber, String description) {
+        String normalizedPhone = MpesaPhoneNumber.normalize(phoneNumber);
 
         Transaction transaction = transactionRepository.save(
                 Transaction.builder()
@@ -178,12 +181,12 @@ public class PaymentService {
                         .amount(amount)
                         .studioId(studioId)
                         .userId(advertiserId)
-                        .mpesaPhoneNumber(phoneNumber)
+                        .mpesaPhoneNumber(normalizedPhone)
                         .description(description)
                         .build()
         );
 
-        StkPushInitiationResult stkResult = mpesaService.initiateStkPush(phoneNumber, amount, transaction.getId());
+        StkPushInitiationResult stkResult = mpesaService.initiateStkPush(normalizedPhone, amount, transaction.getId());
 
         if (!stkResult.isAccepted()) {
             transaction.setStatus(TransactionStatus.FAILED);

@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.studioos.server.booking.dto.BookingResponse;
 import com.studioos.server.booking.dto.ConfirmBookingRequest;
 import com.studioos.server.booking.dto.CreateBookingRequest;
+import com.studioos.server.booking.dto.UpdateBookingRequest;
 import com.studioos.server.booking.dto.PaymentInitiationResponse;
 import com.studioos.server.booking.events.BookingCancelledEvent;
 import com.studioos.server.booking.events.BookingConfirmedEvent;
@@ -37,6 +38,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class BookingServiceImpl {
 
+    private static final long MAX_EXPIRED_ATTEMPTS_PER_SESSION = 2;
+
     private final BookingRepository bookingRepository;
     private final StudioRepository studioRepository;
     private final PaymentService paymentService;
@@ -60,6 +63,23 @@ public class BookingServiceImpl {
             throw StudioosException.badRequest("Session date must be in the future");
         }
 
+        long expiredAttempts = bookingRepository.sumExpiredAttempts(
+                currentUser.getId(),
+                request.getStudioId(),
+                request.getSessionDate(),
+                request.getDurationHours(),
+                BookingStatus.EXPIRED);
+        if (expiredAttempts >= MAX_EXPIRED_ATTEMPTS_PER_SESSION) {
+            throw StudioosException.conflict("This session has expired twice. You cannot request this same session time again.");
+        }
+        List<Booking> expiredMatches = bookingRepository
+                .findByArtistIdAndStudioIdAndSessionDateAndDurationHoursAndStatusOrderByCreatedAtDesc(
+                        currentUser.getId(),
+                        request.getStudioId(),
+                        request.getSessionDate(),
+                        request.getDurationHours(),
+                        BookingStatus.EXPIRED);
+
         LocalDateTime endDate = request.getSessionDate().plusHours(request.getDurationHours());
         List<Booking> conflicts = bookingRepository.findConflictingBookings(
                 request.getStudioId(),
@@ -70,11 +90,27 @@ public class BookingServiceImpl {
             throw StudioosException.badRequest("Studio is not available for the requested time slot");
         }
 
+        if (!expiredMatches.isEmpty()) {
+            Booking retry = expiredMatches.get(0);
+            retry.setStatus(BookingStatus.PENDING);
+            retry.setAttemptCount(retry.getAttemptCount() + 1);
+            retry.setTotalPrice(null);
+            retry.setNotes(request.getNotes());
+            bookingRepository.save(retry);
+            applicationEventPublisher.publishEvent(BookingCreatedEvent.builder()
+                    .bookingId(retry.getId())
+                    .studioId(retry.getStudioId())
+                    .artistId(retry.getArtistId())
+                    .build());
+            return toResponse(retry, studio, currentUser);
+        }
+
         Booking booking = Booking.builder()
                 .studioId(request.getStudioId())
                 .artistId(currentUser.getId())
                 .sessionDate(request.getSessionDate())
                 .durationHours(request.getDurationHours())
+                .attemptCount(1)
                 .notes(request.getNotes())
                 .status(BookingStatus.PENDING)
                 .paymentStatus(BookingPaymentStatus.BOOKED)
@@ -89,6 +125,59 @@ public class BookingServiceImpl {
                 .artistId(booking.getArtistId())
                 .build());
 
+        return toResponse(booking, studio, currentUser);
+    }
+
+    @Transactional
+    public BookingResponse updateArtistBooking(User currentUser, String bookingId, UpdateBookingRequest request) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> StudioosException.notFound("Booking not found"));
+        if (!booking.getArtistId().equals(currentUser.getId()) && currentUser.getRole() != Role.SUPER_ADMIN) {
+            throw StudioosException.forbidden("You cannot edit this booking");
+        }
+
+        boolean isRetry = booking.getStatus() == BookingStatus.EXPIRED;
+        if ((!isRetry && booking.getStatus() != BookingStatus.PENDING)
+                || booking.getPaymentStatus() != BookingPaymentStatus.BOOKED) {
+            throw StudioosException.conflict("Only pending or expired unpaid bookings can be edited");
+        }
+        if (isRetry && booking.getAttemptCount() >= MAX_EXPIRED_ATTEMPTS_PER_SESSION) {
+            throw StudioosException.conflict("This booking has used both attempts and cannot be requested again");
+        }
+        if (!request.getSessionDate().isAfter(LocalDateTime.now())) {
+            throw StudioosException.badRequest("Session date must be in the future");
+        }
+
+        Studio studio = studioRepository.findById(booking.getStudioId())
+                .orElseThrow(() -> StudioosException.notFound("Studio not found"));
+        if (!studio.isAvailable()) {
+            throw StudioosException.badRequest("This studio is not currently accepting bookings");
+        }
+
+        LocalDateTime endDate = request.getSessionDate().plusHours(request.getDurationHours());
+        boolean conflicts = bookingRepository.findConflictingBookings(booking.getStudioId(), request.getSessionDate(), endDate)
+                .stream()
+                .anyMatch(existing -> !existing.getId().equals(bookingId));
+        if (conflicts) {
+            throw StudioosException.conflict("Studio is not available for the requested time slot");
+        }
+
+        booking.setSessionDate(request.getSessionDate());
+        booking.setDurationHours(request.getDurationHours());
+        booking.setNotes(request.getNotes());
+        if (isRetry) {
+            booking.setAttemptCount(booking.getAttemptCount() + 1);
+            booking.setStatus(BookingStatus.PENDING);
+            booking.setTotalPrice(null);
+        }
+        bookingRepository.save(booking);
+        if (isRetry) {
+            applicationEventPublisher.publishEvent(BookingCreatedEvent.builder()
+                    .bookingId(booking.getId())
+                    .studioId(booking.getStudioId())
+                    .artistId(booking.getArtistId())
+                    .build());
+        }
         return toResponse(booking, studio, currentUser);
     }
 
@@ -242,6 +331,7 @@ public class BookingServiceImpl {
                 .artistName(artist != null ? artist.getName() : null)
                 .sessionDate(booking.getSessionDate())
                 .durationHours(booking.getDurationHours())
+                .attemptCount(booking.getAttemptCount())
                 .totalPrice(booking.getTotalPrice())
                 .status(booking.getStatus())
                 .paymentStatus(booking.getPaymentStatus())

@@ -36,6 +36,23 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     // Find pending bookings (awaiting confirmation)
     List<Booking> findByStudioIdAndStatus(String studioId, BookingStatus status);
 
+    List<Booking> findByArtistIdAndStudioIdAndSessionDateAndDurationHoursAndStatusOrderByCreatedAtDesc(
+            Integer artistId,
+            String studioId,
+            LocalDateTime sessionDate,
+            Integer durationHours,
+            BookingStatus status);
+
+    @Query("SELECT COALESCE(SUM(b.attemptCount), 0L) FROM Booking b " +
+           "WHERE b.artistId = :artistId AND b.studioId = :studioId " +
+           "AND b.sessionDate = :sessionDate AND b.durationHours = :durationHours AND b.status = :status")
+    long sumExpiredAttempts(
+            Integer artistId,
+            String studioId,
+            LocalDateTime sessionDate,
+            Integer durationHours,
+            BookingStatus status);
+
     List<Booking> findByStatusAndPaymentStatusAndUpdatedAtBefore(BookingStatus status, BookingPaymentStatus paymentStatus, LocalDateTime updatedAtBefore);
 
     Optional<Booking> findByIdAndStudioId(String bookingId, String studioId);
