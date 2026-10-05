@@ -106,6 +106,7 @@ public class NotificationPreferenceService {
                         BOOKING_CANCELLED,
                         BOOKING_EXPIRED,
                         BEAT_SOLD,
+                        BEAT_PURCHASE_FAILED,
                         WALLET_TRANSACTION,
                         ESCROW_ACTIVITY,
                         ADVERTISEMENT_REVIEW_REQUIRED,
@@ -113,7 +114,8 @@ public class NotificationPreferenceService {
                         ADVERTISEMENT_REJECTED,
                         AD_CAMPAIGN_PAYMENT_SUCCESS,
                         AD_CAMPAIGN_PAYMENT_FAILED,
-                        AD_CAMPAIGN_LIVE -> true;
+                        AD_CAMPAIGN_LIVE,
+                        PAYMENT_RECONCILIATION_REQUIRED -> true;
                 default -> false;
             };
         }
@@ -167,6 +169,7 @@ public class NotificationPreferenceService {
                     BOOKING_EXPIRED,
                     BEAT_PROCESSING_COMPLETED,
                     BEAT_PROCESSING_FAILED,
+                    BEAT_PURCHASE_FAILED,
                     ADVERTISEMENT_APPROVED,
                     ADVERTISEMENT_REJECTED,
                     ADVERTISEMENT_PROCESSING_COMPLETED,
@@ -175,6 +178,7 @@ public class NotificationPreferenceService {
                     AD_CAMPAIGN_PAYMENT_SUCCESS,
                     AD_CAMPAIGN_PAYMENT_FAILED,
                     AD_CAMPAIGN_LIVE,
+                    PAYMENT_RECONCILIATION_REQUIRED,
                     WALLET_TRANSACTION,
                     ESCROW_ACTIVITY -> true;
             default -> false;

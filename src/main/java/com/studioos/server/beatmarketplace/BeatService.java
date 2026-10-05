@@ -330,6 +330,17 @@ public class BeatService {
     }
 
     @Transactional
+    public void restoreArchivedBeat(Integer producerId, String beatId) {
+        Beat beat = findOwnedBeat(producerId, beatId);
+        if (beat.getStatus() != BeatStatus.ARCHIVED) {
+            throw new IllegalStateException("Only archived beats can be restored");
+        }
+        beat.setStatus(BeatStatus.READY);
+        beatRepository.save(beat);
+        applicationEventPublisher.publishEvent(new BeatUpdatedEvent(beat.getId()));
+    }
+
+    @Transactional
     public void retryProcessing(Integer producerId, String beatId) {
         Beat beat = findOwnedBeat(producerId, beatId);
         boolean durationRepair = beat.getStatus() == BeatStatus.READY && beat.getDuration() == null;

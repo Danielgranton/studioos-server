@@ -34,75 +34,87 @@ public class BeatPurchaseService {
     private final PaymentService paymentService;
     private final NotificationServiceImpl notificationService;
 
-   @Transactional
+    @Transactional
     public BeatPurchaseInitiationResponse initiatePurchase(Integer buyerId, String beatId, PurchaseBeatRequest request) {
+        Beat beat = beatRepository.findById(beatId)
+                .orElseThrow(() -> new IllegalArgumentException("Beat not found: " + beatId));
+        if (beat.getStatus() != BeatStatus.READY) {
+            throw new IllegalStateException("Beat is not available for purchase: " + beat.getStatus());
+        }
 
-    Beat beat = beatRepository.findById(beatId)
-            .orElseThrow(() -> new IllegalArgumentException("Beat not found: " + beatId));
+        BeatLicense license = beatLicenseRepository.findById(request.getLicenseId())
+                .orElseThrow(() -> new IllegalArgumentException("License not found: " + request.getLicenseId()));
+        // Serialize exclusive check-and-reserve across app instances before any STK side effect.
+        if (Boolean.TRUE.equals(license.getExclusive())) {
+            license = beatLicenseRepository.findByIdForUpdate(request.getLicenseId())
+                    .orElseThrow(() -> new IllegalArgumentException("License not found: " + request.getLicenseId()));
+        }
+        if (!license.getBeatId().equals(beatId)) {
+            throw new IllegalArgumentException("License " + license.getId() + " does not belong to beat " + beatId);
+        }
+        if (!Boolean.TRUE.equals(license.getActive())) {
+            throw new IllegalStateException("This license is no longer available for purchase");
+        }
 
-    if (beat.getStatus() != BeatStatus.READY) {
-        throw new IllegalStateException("Beat is not available for purchase: " + beat.getStatus());
-    }
+        boolean isExclusive = Boolean.TRUE.equals(license.getExclusive());
+        if (isExclusive) {
+            BeatPurchase existingPending = beatPurchaseRepository
+                    .findFirstByLicenseIdAndBuyerIdAndStatusOrderByPurchasedAtDesc(
+                            license.getId(), buyerId, BeatPaymentStatus.PENDING)
+                    .orElse(null);
+            if (existingPending != null) {
+                log.info("Reusing pending exclusive beat purchase {} for buyer {}", existingPending.getId(), buyerId);
+                return purchaseResponse(existingPending, true);
+            }
+        }
 
-    BeatLicense license = beatLicenseRepository.findById(request.getLicenseId())
-            .orElseThrow(() -> new IllegalArgumentException("License not found: " + request.getLicenseId()));
+        boolean alreadyOwned = beatPurchaseRepository.existsByBeatIdAndBuyerIdAndStatus(
+                beatId, buyerId, BeatPaymentStatus.PAID);
+        if (alreadyOwned) {
+            throw new IllegalStateException("You have already purchased a license for this beat");
+        }
 
-    if (!license.getBeatId().equals(beatId)) {
-        throw new IllegalArgumentException("License " + license.getId() + " does not belong to beat " + beatId);
-    }
-
-    if (!Boolean.TRUE.equals(license.getActive())) {
-        throw new IllegalStateException("This license is no longer available for purchase");
-    }
-
-    boolean alreadyOwned = beatPurchaseRepository.existsByBeatIdAndBuyerIdAndStatus(
-            beatId, buyerId, BeatPaymentStatus.PAID);
-    if (alreadyOwned) {
-        throw new IllegalStateException("You have already purchased a license for this beat");
-    }
-
-    boolean isExclusive = Boolean.TRUE.equals(license.getExclusive());
-
-    if (isExclusive) {
-        List<BeatPurchase> pendingOrPaid = beatPurchaseRepository.findByLicenseIdAndStatusIn(
-                license.getId(), List.of(BeatPaymentStatus.PENDING, BeatPaymentStatus.PAID));
-        if (!pendingOrPaid.isEmpty()) {
+        if (isExclusive && !beatPurchaseRepository.findByLicenseIdAndStatusIn(
+                license.getId(), List.of(BeatPaymentStatus.PENDING, BeatPaymentStatus.PAID)).isEmpty()) {
             throw new IllegalStateException("This exclusive license is already being purchased or has been sold");
         }
+
+        BeatPurchase purchase = BeatPurchase.builder()
+                .beatId(beatId)
+                .buyerId(buyerId)
+                .licenseId(license.getId())
+                .amount(license.getPrice())
+                .status(BeatPaymentStatus.PENDING)
+                .isExclusive(isExclusive)
+                .build();
+        try {
+            // Force the unique reservation constraint to be checked before calling Safaricom.
+            purchase = beatPurchaseRepository.saveAndFlush(purchase);
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalStateException(
+                    "This exclusive license is already being purchased or has been sold. No payment prompt was sent.");
+        }
+
+        Transaction transaction = paymentService.initiateBeatPurchasePayment(
+                buyerId,
+                beat.getStudioId(),
+                license.getPrice(),
+                request.getPhoneNumber(),
+                "Beat purchase: " + beat.getTitle() + " (" + license.getType() + " license)");
+
+        purchase.setTransactionId(transaction.getId());
+        beatPurchaseRepository.save(purchase);
+        return purchaseResponse(purchase, false);
     }
 
-    Transaction transaction = paymentService.initiateBeatPurchasePayment(
-            buyerId,
-            beat.getStudioId(),
-            license.getPrice(),
-            request.getPhoneNumber(),
-            "Beat purchase: " + beat.getTitle() + " (" + license.getType() + " license)"
-    );
-
-    BeatPurchase purchase = BeatPurchase.builder()
-            .beatId(beatId)
-            .buyerId(buyerId)
-            .licenseId(license.getId())
-            .transactionId(transaction.getId())
-            .amount(license.getPrice())
-            .status(BeatPaymentStatus.PENDING)
-            .isExclusive(isExclusive)
-            .build();
-
-    try {
-        purchase = beatPurchaseRepository.save(purchase);
-    } catch (DataIntegrityViolationException e) {
-        // The actual race was lost here — someone else's PENDING/PAID row for this
-        throw new IllegalStateException(
-                "This exclusive license was just purchased by someone else. Your payment was not processed.");
+    private BeatPurchaseInitiationResponse purchaseResponse(BeatPurchase purchase, boolean reused) {
+        return BeatPurchaseInitiationResponse.builder()
+                .purchaseId(purchase.getId())
+                .transactionId(purchase.getTransactionId())
+                .status(purchase.getStatus().name())
+                .reusedExistingRequest(reused)
+                .build();
     }
-
-    return BeatPurchaseInitiationResponse.builder()
-            .purchaseId(purchase.getId())
-            .transactionId(transaction.getId())
-            .status(purchase.getStatus().name())
-            .build();
-}
 
     @EventListener
     @Transactional
@@ -129,6 +141,7 @@ public class BeatPurchaseService {
         if (!event.isSuccess()) {
             purchase.setStatus(BeatPaymentStatus.FAILED);
             beatPurchaseRepository.save(purchase);
+            notifyPurchaseFailure(purchase);
             return;
         }
 
@@ -171,6 +184,22 @@ public class BeatPurchaseService {
             );
         } catch (Exception e) {
             log.error("Failed to send purchase notifications for purchase {}: {}", purchase.getId(), e.getMessage());
+        }
+    }
+
+    private void notifyPurchaseFailure(BeatPurchase purchase) {
+        Beat beat = beatRepository.findById(purchase.getBeatId()).orElse(null);
+        if (beat == null) return;
+        try {
+            notificationService.createNotification(
+                    buildRequest(beat.getProducerId(), NotificationType.BEAT_PURCHASE_FAILED,
+                            "Beat purchase did not complete",
+                            "A buyer's payment for \"" + beat.getTitle()
+                                    + "\" was confirmed as failed. The license is available again.",
+                            purchase.getId()));
+        } catch (Exception e) {
+            log.error("Failed to notify producer about failed beat purchase {}: {}",
+                    purchase.getId(), e.getMessage());
         }
     }
 

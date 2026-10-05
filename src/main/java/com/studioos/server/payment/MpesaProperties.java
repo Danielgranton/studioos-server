@@ -9,6 +9,7 @@ import lombok.Data;
 @ConfigurationProperties(prefix = "mpesa")
 @Data
 public class MpesaProperties {
+    private String baseUrl;
     private String consumerKey;
     private String consumerSecret;
     private String passkey;
@@ -18,4 +19,8 @@ public class MpesaProperties {
     private String environment; // "sandbox" or "production"
     private String initiatorName;
     private String securityCredential;
+    private long reconciliationGracePeriodMs = 120_000;
+    private long reconciliationRetryIntervalMs = 120_000;
+    private int reconciliationBatchSize = 50;
+    private long reviewAfterMs = 86_400_000;
 }

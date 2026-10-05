@@ -161,6 +161,10 @@ mpesa:
   passkey: ${MPESA_PASSKEY}
   callback-url: ${MPESA_CALLBACK_URL}
   timeout-url: ${MPESA_TIMEOUT_URL}
+  reconciliation-grace-period-ms: ${MPESA_RECONCILIATION_GRACE_PERIOD_MS:120000}
+  reconciliation-retry-interval-ms: ${MPESA_RECONCILIATION_RETRY_INTERVAL_MS:120000}
+  reconciliation-batch-size: ${MPESA_RECONCILIATION_BATCH_SIZE:50}
+  review-after-ms: ${MPESA_REVIEW_AFTER_MS:86400000}
 
 # ─── TWILIO SMS ───
 twilio:

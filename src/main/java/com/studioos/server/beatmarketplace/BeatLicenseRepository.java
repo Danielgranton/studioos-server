@@ -6,10 +6,16 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 
 import com.studioos.server.shared.enums.LicenseType;
 
 public interface BeatLicenseRepository extends JpaRepository<BeatLicense, String> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT bl FROM BeatLicense bl WHERE bl.id = :licenseId")
+    Optional<BeatLicense> findByIdForUpdate(@Param("licenseId") String licenseId);
+
     List<BeatLicense> findByBeatId(String beatId);
     List<BeatLicense> findByBeatIdInAndActiveTrue(List<String> beatIds);
     List<BeatLicense> findByBeatIdAndActiveTrue(String beatId);

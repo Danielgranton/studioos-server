@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -20,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.studioos.server.payment.dto.B2cInitiationResult;
 import com.studioos.server.payment.dto.MpesaCallbackResult;
 import com.studioos.server.payment.dto.StkPushInitiationResult;
+import com.studioos.server.payment.dto.StkPushQueryResult;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,9 @@ public class MpesaService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private String baseUrl() {
+        if (mpesaProperties.getBaseUrl() != null && !mpesaProperties.getBaseUrl().isBlank()) {
+            return mpesaProperties.getBaseUrl().trim().replaceAll("/+$", "");
+        }
         return "sandbox".equalsIgnoreCase(mpesaProperties.getEnvironment())
                 ? "https://sandbox.safaricom.co.ke"
                 : "https://api.safaricom.co.ke";
@@ -110,6 +115,57 @@ public class MpesaService {
         } catch (Exception e) {
             log.error("STK Push failed for transaction {}: {}", transactionId, e.getMessage());
             return new StkPushInitiationResult(false, null, null, e.getMessage());
+        }
+    }
+
+    public StkPushQueryResult queryStkPush(String checkoutRequestId) {
+        try {
+            String token = getAccessToken();
+            String ts = timestamp();
+            Map<String, Object> body = new HashMap<>();
+            body.put("BusinessShortCode", mpesaProperties.getShortcode());
+            body.put("Password", stkPassword(ts));
+            body.put("Timestamp", ts);
+            body.put("CheckoutRequestID", checkoutRequestId);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(token);
+            JsonNode response = restTemplate.postForObject(
+                    baseUrl() + "/mpesa/stkpushquery/v1/query",
+                    new HttpEntity<>(body, headers), JsonNode.class);
+            if (response == null || !"0".equals(response.path("ResponseCode").asText())) {
+                return StkPushQueryResult.unknown("Daraja did not accept the status query");
+            }
+            if (!response.hasNonNull("ResultCode")) {
+                return StkPushQueryResult.pending(response.path("ResultDesc").asText("Payment is still processing"));
+            }
+
+            String resultCode = response.path("ResultCode").asText();
+            if ("0".equals(resultCode)) {
+                return StkPushQueryResult.success(response.path("ResultDesc").asText("Payment confirmed"));
+            }
+            if ("1".equals(resultCode) || "1032".equals(resultCode) || "1037".equals(resultCode)) {
+                return StkPushQueryResult.failed(resultCode,
+                        response.path("ResultDesc").asText("Payment was cancelled or timed out"));
+            }
+            return StkPushQueryResult.pending(response.path("ResultDesc").asText("Payment is not yet confirmed"));
+        } catch (HttpStatusCodeException e) {
+            String responseBody = e.getResponseBodyAsString();
+            try {
+                JsonNode error = objectMapper.readTree(responseBody);
+                if ("500.001.1001".equals(error.path("errorCode").asText())) {
+                    return StkPushQueryResult.failed("CHECKOUT_NOT_FOUND",
+                            error.path("errorMessage").asText("Daraja no longer recognizes this checkout"));
+                }
+            } catch (Exception ignored) {
+                // Preserve unknown status for unparseable/transient Daraja errors.
+            }
+            log.warn("Daraja STK status query failed for checkout {}: {}", checkoutRequestId, e.getMessage());
+            return StkPushQueryResult.unknown("Daraja status is temporarily unavailable");
+        } catch (Exception e) {
+            log.warn("Daraja STK status query failed for checkout {}: {}", checkoutRequestId, e.getMessage());
+            return StkPushQueryResult.unknown("Daraja status is temporarily unavailable");
         }
     }
 

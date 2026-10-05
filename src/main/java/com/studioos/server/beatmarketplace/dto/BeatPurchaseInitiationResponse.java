@@ -11,4 +11,5 @@ public class BeatPurchaseInitiationResponse {
     private String purchaseId;
     private String transactionId;
     private String status;
+    private boolean reusedExistingRequest;
 }

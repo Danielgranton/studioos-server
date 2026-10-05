@@ -121,6 +121,9 @@ public class SecurityConfig {
                         .requestMatchers("/admin/reviews/**")
                         .hasAnyRole(Role.ADMIN.name(), Role.SUPER_ADMIN.name())
 
+                        .requestMatchers("/admin/payments/reconciliation/**")
+                        .hasAnyRole(Role.ADMIN.name(), Role.SUPER_ADMIN.name())
+
                         .requestMatchers("/admin/users/**")
                         .hasAnyRole(Role.ADMIN.name(), Role.SUPER_ADMIN.name())
 

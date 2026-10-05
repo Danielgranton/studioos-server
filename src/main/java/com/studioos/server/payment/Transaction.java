@@ -91,5 +91,16 @@ public class Transaction {
     // M-Pesa STK Push
 private String mpesaCheckoutRequestId;
 
-private String mpesaMerchantRequestId;
+    private String mpesaMerchantRequestId;
+
+    private LocalDateTime mpesaStatusCheckedAt;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean mpesaReviewRequired = false;
+
+    private LocalDateTime mpesaReviewFlaggedAt;
+
+    @Column(length = 500)
+    private String mpesaReviewReason;
 }

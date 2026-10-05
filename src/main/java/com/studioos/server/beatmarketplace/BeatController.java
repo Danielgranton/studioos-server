@@ -99,6 +99,14 @@ public class BeatController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{beatId}/restore")
+    public ResponseEntity<Void> restoreArchivedBeat(
+            @AuthenticationPrincipal User producer,
+            @PathVariable String beatId) {
+        beatService.restoreArchivedBeat(producer.getId(), beatId);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{beatId}/upload")
     public ResponseEntity<Void> cancelUpload(
             @AuthenticationPrincipal User producer,

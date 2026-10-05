@@ -22,14 +22,14 @@ public class MpesaCallbackController {
 
     @PostMapping("/callback")
     public MpesaAckResponse handleStkCallback(@RequestBody String rawBody) {
-        log.info("Received M-Pesa STK callback: {}", rawBody);
+        log.info("Received M-Pesa STK callback");
         handleAnyCallback(rawBody);
         return MpesaAckResponse.ok();
     }
 
     @PostMapping("/timeout")
     public MpesaAckResponse handleB2cResult(@RequestBody String rawBody) {
-        log.info("Received M-Pesa B2C result/timeout callback: {}", rawBody);
+        log.info("Received M-Pesa B2C result/timeout callback");
         handleAnyCallback(rawBody);
         return MpesaAckResponse.ok();
     }
@@ -41,6 +41,7 @@ public class MpesaCallbackController {
                 paymentService.handleMpesaCallback(
                         stkResult.getReferenceId(),
                         stkResult.isSuccess(),
+                        stkResult.getAmount(),
                         stkResult.getMpesaReceiptNumber());
                 return;
             }

@@ -15,6 +15,8 @@ public interface BeatPurchaseRepository extends JpaRepository<BeatPurchase, Stri
     Optional<BeatPurchase> findByTransactionId(String transactionId);
     Optional<BeatPurchase> findByBeatIdAndBuyerIdAndStatus(String beatId, Integer buyerId, BeatPaymentStatus status);
     List<BeatPurchase> findByLicenseIdAndStatusIn(String licenseId, List<BeatPaymentStatus> statuses);
+    Optional<BeatPurchase> findFirstByLicenseIdAndBuyerIdAndStatusOrderByPurchasedAtDesc(
+            String licenseId, Integer buyerId, BeatPaymentStatus status);
     List<BeatPurchase> findByBeatIdInAndStatus(List<String> beatIds, BeatPaymentStatus status);
     boolean existsByBeatId(String beatId);
 }
