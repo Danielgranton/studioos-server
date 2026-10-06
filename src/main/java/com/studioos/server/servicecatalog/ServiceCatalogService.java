@@ -55,7 +55,9 @@ public class ServiceCatalogService {
                 if (!seenOfferings.add(offering.getId())) continue;
                 userRepository.findById(offering.getArtistId()).ifPresent(user -> providers.add(new ServiceProviderResponse(
                         "ARTIST", String.valueOf(user.getId()), user.getName(), user.getLocation(), profileImage(user),
-                        offering.getName(), offering.getDescription(), offering.getPrice(), offering.getCurrency(), user.getVerificationStatus() != null && user.getVerificationStatus().name().equals("VERIFIED"))));
+                        offering.getName(), offering.getDescription(), offering.getPrice(), offering.getCurrency(),
+                        user.getVerificationStatus() != null && user.getVerificationStatus().name().equals("VERIFIED"),
+                        offering.getId(), null, offering.getCatalogServiceId())));
             }
         }
         if (providerType == null || "PRODUCER".equalsIgnoreCase(providerType) || "STUDIO".equalsIgnoreCase(providerType)) {
@@ -63,7 +65,8 @@ public class ServiceCatalogService {
                 userRepository.findById(studio.getOwnerId()).ifPresent(producer -> providers.add(new ServiceProviderResponse(
                         "PRODUCER", String.valueOf(producer.getId()), producer.getName(), producer.getLocation(), profileImage(producer),
                         service.getName(), studio.getDescription(), studio.getPricing(), "KES",
-                        studio.isVerified() || producer.getVerificationStatus() != null && producer.getVerificationStatus().name().equals("VERIFIED"))));
+                        studio.isVerified() || producer.getVerificationStatus() != null && producer.getVerificationStatus().name().equals("VERIFIED"),
+                        studio.getId(), studio.getId(), service.getId())));
             }
         }
         return providers;

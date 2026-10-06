@@ -22,9 +22,14 @@ public class MpesaPaymentReconciliationScheduler {
 
     @Scheduled(fixedDelayString = "${mpesa.reconciliation-interval-ms:60000}")
     public void reconcileStaleBeatPayments() {
+        reconcile(TransactionType.BEAT_PURCHASE);
+        reconcile(TransactionType.SERVICE_BOOKING_PAYMENT);
+    }
+
+    private void reconcile(TransactionType type) {
         LocalDateTime now = LocalDateTime.now();
         var candidates = transactionRepository.findReconciliationCandidates(
-                TransactionType.BEAT_PURCHASE,
+                type,
                 TransactionStatus.PENDING,
                 now.minusNanos(properties.getReconciliationGracePeriodMs() * 1_000_000),
                 now.minusNanos(properties.getReconciliationRetryIntervalMs() * 1_000_000),
@@ -33,7 +38,7 @@ public class MpesaPaymentReconciliationScheduler {
             try {
                 paymentService.reconcileStaleTransaction(transactionId);
             } catch (Exception e) {
-                log.warn("Could not reconcile pending beat payment {}: {}", transactionId, e.getMessage());
+                log.warn("Could not reconcile pending {} payment {}: {}", type, transactionId, e.getMessage());
             }
         }
     }

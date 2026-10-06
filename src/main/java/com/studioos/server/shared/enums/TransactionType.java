@@ -8,4 +8,5 @@ public enum TransactionType {
     WITHDRAWAL,
     REFUND,
     AD_CAMPAIGN,
+    SERVICE_BOOKING_PAYMENT
 }

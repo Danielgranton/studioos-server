@@ -250,6 +250,33 @@ public class PaymentService {
     }
 
     @Transactional
+    public Transaction initiateServiceBookingPayment(Integer requesterId, String studioId, Integer amount,
+            String phoneNumber, String serviceBookingId, String description) {
+        String normalizedPhone = MpesaPhoneNumber.normalize(phoneNumber);
+        Transaction transaction = transactionRepository.save(Transaction.builder()
+                .type(TransactionType.SERVICE_BOOKING_PAYMENT)
+                .status(TransactionStatus.PENDING)
+                .amount(amount)
+                .studioId(studioId)
+                .userId(requesterId)
+                .serviceBookingId(serviceBookingId)
+                .mpesaPhoneNumber(normalizedPhone)
+                .description(description)
+                .build());
+        StkPushInitiationResult stkResult = mpesaService.initiateStkPush(normalizedPhone, amount, transaction.getId());
+        if (!stkResult.isAccepted()) {
+            transaction.setStatus(TransactionStatus.FAILED);
+            transactionRepository.save(transaction);
+            throw new IllegalStateException("STK Push was not accepted: " + stkResult.getResponseDescription());
+        }
+        transaction.setMpesaCheckoutRequestId(stkResult.getCheckoutRequestId());
+        transactionRepository.save(transaction);
+        writeAudit(AuditEventType.TRANSACTION_CREATED, transaction.getId(), "Transaction", requesterId,
+                "Service booking payment initiated: " + serviceBookingId);
+        return transaction;
+    }
+
+    @Transactional
     public Transaction initiateAdCampaignPayment(Integer advertiserId, String studioId, Integer amount,
                                                 String phoneNumber, String description) {
         String normalizedPhone = MpesaPhoneNumber.normalize(phoneNumber);

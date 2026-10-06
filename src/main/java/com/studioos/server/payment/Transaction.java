@@ -56,6 +56,8 @@ public class Transaction {
     // ─── Optional links depending on transaction type ───
     private String bookingId;
 
+    private String serviceBookingId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bookingId", insertable = false, updatable = false)
     private Booking booking;

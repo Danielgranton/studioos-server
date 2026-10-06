@@ -105,6 +105,8 @@ public class NotificationPreferenceService {
                         BOOKING_CONFIRMED,
                         BOOKING_CANCELLED,
                         BOOKING_EXPIRED,
+                        SERVICE_BOOKING_REQUEST,
+                        SERVICE_BOOKING_UPDATE,
                         BEAT_SOLD,
                         BEAT_PURCHASE_FAILED,
                         WALLET_TRANSACTION,
@@ -126,6 +128,8 @@ public class NotificationPreferenceService {
                         BOOKING_CONFIRMED,
                         BOOKING_CANCELLED,
                         BOOKING_EXPIRED,
+                        SERVICE_BOOKING_REQUEST,
+                        SERVICE_BOOKING_UPDATE,
                         PAYMENT_REQUEST,
                         PROJECT_UPDATE,
                         BEAT_PURCHASED,
@@ -148,12 +152,14 @@ public class NotificationPreferenceService {
 
         if (role == Role.PRODUCER) {
             return notificationType == NotificationType.BOOKING_REQUEST
+                    || notificationType == NotificationType.SERVICE_BOOKING_REQUEST
                     || notificationType == NotificationType.BOOKING_CANCELLED
                     || notificationType == NotificationType.AD_CAMPAIGN_PAYMENT_FAILED;
         }
 
         if (role == Role.ARTIST) {
             return notificationType == NotificationType.BOOKING_CONFIRMED
+                    || notificationType == NotificationType.SERVICE_BOOKING_UPDATE
                     || notificationType == NotificationType.BOOKING_CANCELLED
                     || notificationType == NotificationType.PAYMENT_REQUEST;
         }
@@ -167,6 +173,8 @@ public class NotificationPreferenceService {
                     BOOKING_CONFIRMED,
                     BOOKING_CANCELLED,
                     BOOKING_EXPIRED,
+                    SERVICE_BOOKING_REQUEST,
+                    SERVICE_BOOKING_UPDATE,
                     BEAT_PROCESSING_COMPLETED,
                     BEAT_PROCESSING_FAILED,
                     BEAT_PURCHASE_FAILED,
