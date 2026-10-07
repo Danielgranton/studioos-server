@@ -13,5 +13,6 @@ public record ServiceProviderResponse(
         boolean verified,
         String listingId,
         String studioId,
-        String catalogServiceId) {
+        String catalogServiceId,
+        String priceType) {
 }

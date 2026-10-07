@@ -36,6 +36,8 @@ import com.studioos.server.studio.dto.CreateStudioRequest;
 import com.studioos.server.studio.dto.RateStudioRequest;
 import com.studioos.server.studio.dto.StudioResponse;
 import com.studioos.server.studio.dto.UpdateStudioRequest;
+import com.studioos.server.studio.dto.StudioServiceOfferingRequest;
+import com.studioos.server.studio.dto.StudioServiceOfferingResponse;
 import com.studioos.server.user.User;
 import com.studioos.server.servicecatalog.ServiceCatalog;
 import com.studioos.server.servicecatalog.ServiceCatalogService;
@@ -47,6 +49,9 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 public class StudioServiceImpl {
+
+    private static final List<String> DEFAULT_PRODUCTION_STAGES = List.of(
+            "Beat creation", "Recording", "Mixing", "Mastering");
 
     private final StudioRepository studioRepository;
     private final StudioLikeRepository studioLikeRepository;
@@ -73,6 +78,7 @@ public class StudioServiceImpl {
             if (currentUser.getRole() != Role.PRODUCER && currentUser.getRole() != Role.SUPER_ADMIN) {
                 throw StudioosException.forbidden("Only producers can create studios");
             }
+            validateServicePackage(request.getServiceDetails(), request.getProductionPackagePrice());
 
             // ─── Save studio first to get the generated ID ───
             Studio studio = Studio.builder()
@@ -81,6 +87,7 @@ public class StudioServiceImpl {
                             ? currentUser.getLocation()
                             : request.getLocation())
                     .pricing(request.getPricing())
+                    .productionPackagePrice(request.getProductionPackagePrice())
                     .availability(request.getAvailability())
                     .description(request.getDescription())
                     .badge(request.getBadge())
@@ -97,18 +104,9 @@ public class StudioServiceImpl {
             studioRepository.save(studio); // ← ID generated here
 
             // ─── Now add services with the real studio ID ───
-            if (request.getServices() != null && !request.getServices().isEmpty()) {
-                List<StudioService> services = request.getServices().stream()
-                        .map(name -> StudioService.builder()
-                                .name(name)
-                                .catalogServiceId(resolveCatalogServiceId(name))
-                                .studioId(studio.getId()) // ← now has real ID
-                                .studio(studio)
-                                .build())
-                        .collect(Collectors.toList());
-                studio.getServices().addAll(services);
-                studioRepository.save(studio);
-            }
+            studio.getServices().addAll(buildStudioServices(studio,
+                    request.getServiceDetails(), request.getServices()));
+            studioRepository.save(studio);
 
             log.info("Studio created: {} by user: {}", studio.getStudioName(), currentUser.getEmail());
             applyProfileImage(studio, request.getProfileImage());
@@ -121,12 +119,18 @@ public class StudioServiceImpl {
     @Transactional
     public StudioResponse updateStudio(User currentUser, String studioId, UpdateStudioRequest request) {
         Studio studio = findStudioAndVerifyOwner(studioId, currentUser);
+        if (request.getServiceDetails() != null) {
+            validateServicePackage(request.getServiceDetails(),
+                    request.getProductionPackagePrice() == null
+                            ? studio.getProductionPackagePrice() : request.getProductionPackagePrice());
+        }
 
         if (request.getStudioName() != null) studio.setStudioName(request.getStudioName());
         if (studio.getOwner() != null && studio.getOwner().getLocation() != null) {
             studio.setLocation(studio.getOwner().getLocation());
         }
         if (request.getPricing() != null) studio.setPricing(request.getPricing());
+        if (request.getProductionPackagePrice() != null) studio.setProductionPackagePrice(request.getProductionPackagePrice());
         if (request.getAvailability() != null) studio.setAvailability(request.getAvailability());
         if (request.getDescription() != null) studio.setDescription(request.getDescription());
         if (request.getBadge() != null) studio.setBadge(request.getBadge());
@@ -140,17 +144,10 @@ public class StudioServiceImpl {
         if (request.getProfileImage() != null) applyProfileImage(studio, request.getProfileImage());
 
         // ─── Replace services if provided ───
-        if (request.getServices() != null) {
+        if (request.getServiceDetails() != null || request.getServices() != null) {
             studio.getServices().clear();
-            List<StudioService> services = request.getServices().stream()
-                    .map(name -> StudioService.builder()
-                            .name(name)
-                            .catalogServiceId(resolveCatalogServiceId(name))
-                            .studioId(studio.getId())
-                            .studio(studio)
-                            .build())
-                    .collect(Collectors.toList());
-            studio.getServices().addAll(services);
+            studio.getServices().addAll(buildStudioServices(studio,
+                    request.getServiceDetails(), request.getServices()));
         }
 
         studioRepository.save(studio);
@@ -161,6 +158,52 @@ public class StudioServiceImpl {
 
     private String resolveCatalogServiceId(String name) {
         return serviceCatalogService.findByName(name).map(ServiceCatalog::getId).orElse(null);
+    }
+
+    private List<StudioService> buildStudioServices(Studio studio,
+            List<StudioServiceOfferingRequest> details, List<String> legacyNames) {
+        if (details != null) {
+            return details.stream().map(item -> StudioService.builder()
+                    .name(item.getName().trim())
+                    .catalogServiceId(item.getCatalogServiceId() != null
+                            ? item.getCatalogServiceId() : resolveCatalogServiceId(item.getName()))
+                    .active(item.isActive())
+                    .includedInProductionPackage(item.isIncludedInProductionPackage())
+                    .price(item.isIncludedInProductionPackage() ? null : item.getPrice())
+                    .studioId(studio.getId()).studio(studio).build()).toList();
+        }
+
+        java.util.LinkedHashMap<String, StudioService> services = new java.util.LinkedHashMap<>();
+        for (String stage : DEFAULT_PRODUCTION_STAGES) {
+            services.put(stage.toLowerCase(java.util.Locale.ROOT), StudioService.builder()
+                    .name(stage).catalogServiceId(resolveCatalogServiceId(stage))
+                    .includedInProductionPackage(true).studioId(studio.getId()).studio(studio).build());
+        }
+        if (legacyNames != null) {
+            for (String name : legacyNames) {
+                if (name == null || name.isBlank()) continue;
+                services.putIfAbsent(name.trim().toLowerCase(java.util.Locale.ROOT), StudioService.builder()
+                        .name(name.trim()).catalogServiceId(resolveCatalogServiceId(name))
+                        .studioId(studio.getId()).studio(studio).build());
+            }
+        }
+        return List.copyOf(services.values());
+    }
+
+    private void validateServicePackage(List<StudioServiceOfferingRequest> details, Integer packagePrice) {
+        if (packagePrice == null || packagePrice < 1) {
+            throw StudioosException.badRequest("Set a full-production package price before publishing services");
+        }
+        if (details == null) return;
+        boolean hasPackageStage = details.stream().anyMatch(item -> item.isIncludedInProductionPackage() && item.isActive());
+        if (!hasPackageStage) {
+            throw StudioosException.badRequest("Keep at least one production stage in the package");
+        }
+        boolean hasUnpricedAddon = details.stream().anyMatch(item -> item.isActive()
+                && !item.isIncludedInProductionPackage() && (item.getPrice() == null || item.getPrice() < 1));
+        if (hasUnpricedAddon) {
+            throw StudioosException.badRequest("Set a separate price for each active add-on service");
+        }
     }
 
     // ─── Upload studio image ───
@@ -396,6 +439,7 @@ public class StudioServiceImpl {
                         ? studio.getOwner().getLocation()
                         : studio.getLocation())
                 .pricing(studio.getPricing())
+                .productionPackagePrice(studio.getProductionPackagePrice())
                 .availability(studio.getAvailability())
                 .description(studio.getDescription())
                 .badge(studio.getBadge())
@@ -419,8 +463,13 @@ public class StudioServiceImpl {
                 .ownerId(studio.getOwnerId())
                 .ownerName(studio.getOwner() != null ? studio.getOwner().getName() : null)
                 .ownerProfileImageThumbnail(resolveOwnerThumbnail(studio.getOwner()))
-                .services(studio.getServices().stream()
+                .services(studio.getServices().stream().filter(StudioService::isActive)
                         .map(s -> s.getName())
+                        .collect(Collectors.toList()))
+                .serviceDetails(studio.getServices().stream().map(s -> StudioServiceOfferingResponse.builder()
+                        .id(s.getId()).name(s.getName()).catalogServiceId(s.getCatalogServiceId())
+                        .active(s.isActive())
+                        .includedInProductionPackage(s.isIncludedInProductionPackage()).price(s.getPrice()).build())
                         .collect(Collectors.toList()))
                 .media(studioMediaService.getMedia(studio.getId()))
                 .averageRating(avgRating)

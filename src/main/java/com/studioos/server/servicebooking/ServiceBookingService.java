@@ -55,15 +55,20 @@ public class ServiceBookingService {
         } else if ("PRODUCER".equals(providerType)) {
             Studio studio = studioRepository.findById(request.getStudioId() == null ? request.getListingId() : request.getStudioId())
                     .orElseThrow(() -> StudioosException.notFound("Studio service is no longer available"));
-            if (!studio.getOwnerId().equals(request.getProviderId()) || !studio.isAvailable()
-                    || studio.getServices().stream().noneMatch(service ->
-                            request.getCatalogServiceId() != null
-                                    ? request.getCatalogServiceId().equals(service.getCatalogServiceId())
-                                            || service.getName().equalsIgnoreCase(request.getServiceName())
-                                    : service.getName().equalsIgnoreCase(request.getServiceName()))) {
+            var offer = studio.getServices().stream().filter(service ->
+                    request.getCatalogServiceId() != null
+                            ? request.getCatalogServiceId().equals(service.getCatalogServiceId())
+                                    || service.getName().equalsIgnoreCase(request.getServiceName())
+                            : service.getName().equalsIgnoreCase(request.getServiceName()))
+                    .filter(com.studioos.server.studio.StudioService::isActive)
+                    .findFirst().orElse(null);
+            if (!studio.getOwnerId().equals(request.getProviderId()) || !studio.isAvailable() || offer == null) {
                 throw StudioosException.notFound("Studio service is no longer available");
             }
-            amount = studio.getPricing() == null ? 0 : studio.getPricing();
+            amount = offer.isIncludedInProductionPackage() ? studio.getProductionPackagePrice() : offer.getPrice();
+            if (amount == null || amount < 1) {
+                throw StudioosException.conflict("This provider has not set a price for the selected service");
+            }
             currency = "KES";
         } else {
             throw StudioosException.badRequest("Provider type must be ARTIST or PRODUCER");

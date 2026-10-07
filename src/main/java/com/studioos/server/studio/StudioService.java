@@ -33,6 +33,17 @@ public class StudioService {
     private String catalogServiceId;
 
     @Column(nullable = false)
+    @Builder.Default
+    private boolean active = true;
+
+    @Column(name = "included_in_production_package", nullable = false)
+    @Builder.Default
+    private boolean includedInProductionPackage = false;
+
+    @Column(name = "service_price")
+    private Integer price;
+
+    @Column(nullable = false)
     private String studioId;
 
     @ManyToOne(fetch = FetchType.LAZY)

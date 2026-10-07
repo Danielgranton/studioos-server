@@ -36,6 +36,9 @@ public class Studio {
 
     private Integer pricing;
 
+    @Column(name = "production_package_price")
+    private Integer productionPackagePrice;
+
     @Column(nullable = false)
     private String availability;
 

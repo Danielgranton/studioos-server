@@ -57,16 +57,24 @@ public class ServiceCatalogService {
                         "ARTIST", String.valueOf(user.getId()), user.getName(), user.getLocation(), profileImage(user),
                         offering.getName(), offering.getDescription(), offering.getPrice(), offering.getCurrency(),
                         user.getVerificationStatus() != null && user.getVerificationStatus().name().equals("VERIFIED"),
-                        offering.getId(), null, offering.getCatalogServiceId())));
+                        offering.getId(), null, offering.getCatalogServiceId(), "SERVICE")));
             }
         }
         if (providerType == null || "PRODUCER".equalsIgnoreCase(providerType) || "STUDIO".equalsIgnoreCase(providerType)) {
             for (Studio studio : studioRepository.findAvailableByCatalogServiceIdOrName(service.getId(), serviceNameAliases(service))) {
+                var matchingOffer = studio.getServices().stream()
+                        .filter(offer -> offer.isActive() && (service.getId().equals(offer.getCatalogServiceId())
+                                || serviceNameAliases(service).contains(offer.getName().trim().toLowerCase(Locale.ROOT))))
+                        .findFirst().orElse(null);
+                if (matchingOffer == null) continue;
+                Integer listedPrice = matchingOffer.isIncludedInProductionPackage()
+                        ? studio.getProductionPackagePrice() : matchingOffer.getPrice();
                 userRepository.findById(studio.getOwnerId()).ifPresent(producer -> providers.add(new ServiceProviderResponse(
                         "PRODUCER", String.valueOf(producer.getId()), producer.getName(), producer.getLocation(), profileImage(producer),
-                        service.getName(), studio.getDescription(), studio.getPricing(), "KES",
+                        service.getName(), studio.getDescription(), listedPrice, "KES",
                         studio.isVerified() || producer.getVerificationStatus() != null && producer.getVerificationStatus().name().equals("VERIFIED"),
-                        studio.getId(), studio.getId(), service.getId())));
+                        studio.getId(), studio.getId(), service.getId(),
+                        matchingOffer.isIncludedInProductionPackage() ? "PRODUCTION_PACKAGE" : "ADD_ON")));
             }
         }
         return providers;

@@ -4,6 +4,7 @@ import java.util.List;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 @Data
@@ -17,6 +18,9 @@ public class CreateStudioRequest {
 
     @NotNull(message = "Pricing is required")
     private Integer pricing;
+    @NotNull(message = "Full-production package price is required")
+    @Positive(message = "Full-production package price must be greater than zero")
+    private Integer productionPackagePrice;
 
     @NotBlank(message = "Availability is required")
     private String availability;
@@ -36,4 +40,5 @@ public class CreateStudioRequest {
     private String profileImage;
 
     private List<String> services;
+    private List<StudioServiceOfferingRequest> serviceDetails;
 }

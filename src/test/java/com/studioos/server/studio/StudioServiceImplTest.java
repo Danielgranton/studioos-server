@@ -42,6 +42,12 @@ class StudioServiceImplTest {
     @Mock
     private StudioRatingRepository ratingRepository;
     @Mock
+    private StudioLikeRepository studioLikeRepository;
+    @Mock
+    private StudioMediaService studioMediaService;
+    @Mock
+    private com.studioos.server.engagement.PopularityService popularityService;
+    @Mock
     private BeatRepository beatRepository;
     @Mock
     private BookingRepository bookingRepository;
@@ -79,7 +85,7 @@ class StudioServiceImplTest {
         Page<Studio> page = new PageImpl<>(List.of(studioA, studioB), PageRequest.of(0, 10), 2);
         when(studioRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
         when(ratingRepository.findAverageRatingByStudioId(anyString())).thenReturn(4.5);
-        when(ratingRepository.countByStudioId(anyString())).thenReturn(3L);
+        when(ratingRepository.countByStudioIdAndModerationStatus(anyString(), any())).thenReturn(3L);
 
         PageResponse<StudioResponse> response = studioService.getAllStudios("Nairobi", 2500, 0, 10);
 

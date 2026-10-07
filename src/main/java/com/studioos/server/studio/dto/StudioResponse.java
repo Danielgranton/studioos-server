@@ -19,6 +19,7 @@ public class StudioResponse {
     private String studioName;
     private String location;
     private Integer pricing;
+    private Integer productionPackagePrice;
     private String availability;
     private String description;
     private String badge;
@@ -41,6 +42,7 @@ public class StudioResponse {
     private String ownerName;
     private String ownerProfileImageThumbnail;
     private List<String> services;
+    private List<StudioServiceOfferingResponse> serviceDetails;
     private List<StudioMediaResponse> media;
     private Double averageRating;
     private Long totalRatings;
