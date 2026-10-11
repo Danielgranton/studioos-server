@@ -93,6 +93,7 @@ public class StudioServiceImpl {
                     .badge(request.getBadge())
                     .genres(request.getGenres() != null ? request.getGenres() : List.of())
                     .equipment(request.getEquipment() != null ? request.getEquipment() : List.of())
+                    .rules(cleanStudioRules(request.getRules()))
                     .rooms(request.getRooms())
                     .yearsActive(request.getYearsActive())
                     .responseTime(request.getResponseTime())
@@ -138,6 +139,7 @@ public class StudioServiceImpl {
         if (request.getBadge() != null) studio.setBadge(request.getBadge());
         if (request.getGenres() != null) studio.setGenres(request.getGenres());
         if (request.getEquipment() != null) studio.setEquipment(request.getEquipment());
+        if (request.getRules() != null) studio.setRules(cleanStudioRules(request.getRules()));
         if (request.getRooms() != null) studio.setRooms(request.getRooms());
         if (request.getYearsActive() != null) studio.setYearsActive(request.getYearsActive());
         if (request.getResponseTime() != null) studio.setResponseTime(request.getResponseTime());
@@ -160,6 +162,16 @@ public class StudioServiceImpl {
 
     private String resolveCatalogServiceId(String name) {
         return serviceCatalogService.findByName(name).map(ServiceCatalog::getId).orElse(null);
+    }
+
+    private List<String> cleanStudioRules(List<String> rules) {
+        if (rules == null) return List.of();
+        return rules.stream()
+                .filter(rule -> rule != null && !rule.isBlank())
+                .map(String::trim)
+                .distinct()
+                .limit(30)
+                .toList();
     }
 
     private List<StudioService> buildStudioServices(Studio studio,
@@ -442,6 +454,7 @@ public class StudioServiceImpl {
                 .badge(studio.getBadge())
                 .genres(studio.getGenres())
                 .equipment(studio.getEquipment())
+                .rules(studio.getRules() != null ? studio.getRules() : List.of())
                 .rooms(studio.getRooms())
                 .yearsActive(studio.getYearsActive())
                 .responseTime(studio.getResponseTime())

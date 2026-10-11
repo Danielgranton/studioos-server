@@ -51,7 +51,6 @@ public class RecordingSessionService {
                             .artistId(booking.getArtistId())
                             .producerId(studio.getOwnerId())
                             .scheduledStart(booking.getSessionDate())
-                            .scheduledEnd(booking.getSessionDate().plusHours(booking.getDurationHours()))
                             .status(SessionStatus.WAITING)
                             .notes(booking.getNotes())
                             .build();

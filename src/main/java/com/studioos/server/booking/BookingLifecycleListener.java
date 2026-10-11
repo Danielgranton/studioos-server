@@ -6,7 +6,11 @@ import com.studioos.server.booking.events.BookingCreatedEvent;
 import com.studioos.server.booking.events.BookingExpiredEvent;
 import com.studioos.server.notification.NotificationServiceImpl;
 import com.studioos.server.notification.dto.CreateNotificationRequest;
+import com.studioos.server.payment.Transaction;
+import com.studioos.server.payment.TransactionRepository;
 import com.studioos.server.shared.enums.NotificationType;
+import com.studioos.server.shared.enums.TransactionType;
+import com.studioos.server.shared.events.TransactionResolvedEvent;
 import com.studioos.server.user.User;
 import com.studioos.server.user.UserRepository;
 import com.studioos.server.studio.StudioRepository;
@@ -21,8 +25,10 @@ import org.springframework.stereotype.Component;
 public class BookingLifecycleListener {
 
     private final NotificationServiceImpl notificationService;
+    private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final StudioRepository studioRepository;
+    private final TransactionRepository transactionRepository;
 
     @EventListener
     public void onBookingCreated(BookingCreatedEvent event) {
@@ -82,6 +88,22 @@ public class BookingLifecycleListener {
                         "Booking expired",
                         "A booking expired because payment was not completed in time.",
                         event.getBookingId()));
+    }
+
+    @EventListener
+    public void onBookingPaymentResolved(TransactionResolvedEvent event) {
+        if (event.getType() != TransactionType.BOOKING_PAYMENT || event.isSuccess()) {
+            return;
+        }
+
+        transactionRepository.findById(event.getTransactionId())
+                .map(Transaction::getBookingId)
+                .filter(bookingId -> bookingId != null && !bookingId.isBlank())
+                .flatMap(bookingRepository::findById)
+                .ifPresent(booking -> send(booking.getArtistId(), NotificationType.BOOKING_PAYMENT_FAILED,
+                        "Booking payment failed",
+                        "Your payment could not be completed. You can retry it from your bookings.",
+                        booking.getId()));
     }
 
     private java.util.Optional<User> bookingOwner(String studioId) {

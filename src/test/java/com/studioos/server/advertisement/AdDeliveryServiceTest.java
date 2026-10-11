@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,6 +27,7 @@ import com.studioos.server.shared.storage.PresignedUrlService;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -42,6 +45,8 @@ class AdDeliveryServiceTest {
     private AdvertisementPricingRepository advertisementPricingRepository;
     @Mock
     private AdImpressionRepository adImpressionRepository;
+    @Mock
+    private AdImpressionVerificationRepository adImpressionVerificationRepository;
     @Mock
     private PresignedUrlService presignedUrlService;
     @Mock
@@ -75,6 +80,8 @@ class AdDeliveryServiceTest {
                 .campaignId("campaign-1")
                 .type(AdCreativeType.IMAGE)
                 .headline("Eligible")
+                .mediaUrl("s3://configured-studioos-bucket/ads/uploads/ad-eligible/creative.webp")
+                .thumbnailUrl("s3://configured-studioos-bucket/ads/uploads/ad-eligible/thumbnail.webp")
                 .ctaUrl("https://example.com/eligible")
                 .status(AdCreativeStatus.READY)
                 .build();
@@ -95,6 +102,11 @@ class AdDeliveryServiceTest {
         when(advertisementRepository.findByCampaignId("campaign-1")).thenReturn(List.of(capped, eligible));
         when(adBudgetRepository.findByCampaignId("campaign-1")).thenReturn(Optional.of(budget));
         when(advertisementPricingRepository.findByAdvertisementId("ad-eligible")).thenReturn(Optional.of(pricing));
+        ReflectionTestUtils.setField(adDeliveryService, "mediaBucket", "configured-studioos-bucket");
+        when(presignedUrlService.generateDownloadUrl("configured-studioos-bucket", "ads/uploads/ad-eligible/creative.webp", 300))
+                .thenReturn("https://storage.example/creative");
+        when(presignedUrlService.generateDownloadUrl("configured-studioos-bucket", "ads/uploads/ad-eligible/thumbnail.webp", 300))
+                .thenReturn("https://storage.example/thumbnail");
         when(targetingService.matchesUser("campaign-1", 7)).thenReturn(true);
         when(adImpressionRepository.countByAdvertisementIdAndUserIdAndOccurredAtAfter(eq("ad-capped"), eq(7), any()))
                 .thenReturn(3L, 1L);
@@ -103,6 +115,18 @@ class AdDeliveryServiceTest {
 
         assertThat(adDeliveryService.selectAdvertisement(AdPlacement.HOME_BANNER, 7))
                 .isPresent()
-                .hasValueSatisfying(resp -> assertThat(resp.getAdvertisementId()).isEqualTo("ad-eligible"));
+                .hasValueSatisfying(resp -> {
+                    assertThat(resp.getAdvertisementId()).isEqualTo("ad-eligible");
+                    assertThat(resp.getImpressionToken()).isNotBlank();
+                    assertThat(resp.getMediaUrl()).isEqualTo("https://storage.example/creative");
+                    assertThat(resp.getThumbnailUrl()).isEqualTo("https://storage.example/thumbnail");
+                });
+
+        verify(presignedUrlService).generateDownloadUrl("configured-studioos-bucket", "ads/uploads/ad-eligible/creative.webp", 300);
+        verify(presignedUrlService).generateDownloadUrl("configured-studioos-bucket", "ads/uploads/ad-eligible/thumbnail.webp", 300);
+        verify(adImpressionVerificationRepository).save(any(AdImpressionVerification.class));
+        verify(adImpressionRepository, never()).save(any(AdImpression.class));
+        assertThat(budget.getRemainingBudget()).isEqualTo(1000);
+        assertThat(budget.getSpentBudget()).isEqualTo(0);
     }
 }

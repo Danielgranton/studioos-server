@@ -4,6 +4,7 @@ import java.util.Optional;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import com.studioos.server.advertisement.dto.AdDeliveryResponse;
+import com.studioos.server.advertisement.dto.AdImpressionConfirmationResponse;
 import com.studioos.server.shared.enums.AdPlacement;
 import com.studioos.server.user.User;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ public class AdDeliveryController {
 
     private final AdDeliveryService adDeliveryService;
     private final AdClickService adClickService;
+    private final AdImpressionConfirmationService adImpressionConfirmationService;
 
     @GetMapping("/serve")
     public Optional<AdDeliveryResponse> serve(
@@ -22,6 +24,14 @@ public class AdDeliveryController {
             @AuthenticationPrincipal User user) {
         Integer userId = (user != null) ? user.getId() : null;
         return adDeliveryService.selectAdvertisement(placement, userId);
+    }
+
+    @PostMapping("/impressions/{token}/confirm")
+    public AdImpressionConfirmationResponse confirmImpression(
+            @PathVariable String token,
+            @AuthenticationPrincipal User user) {
+        Integer userId = (user != null) ? user.getId() : null;
+        return adImpressionConfirmationService.confirm(token, userId);
     }
 
     @PostMapping("/{advertisementId}/click")

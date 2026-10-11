@@ -3,8 +3,12 @@ package com.studioos.server.advertisement.campaign;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import com.studioos.server.advertisement.AdNotificationService;
 import com.studioos.server.advertisement.campaign.dto.CampaignPaymentInitiationResponse;
+import com.studioos.server.advertisement.campaign.dto.AdCampaignManagementResponse;
 import com.studioos.server.advertisement.campaign.dto.CampaignResponse;
 import com.studioos.server.advertisement.campaign.dto.CreateCampaignRequest;
 import com.studioos.server.advertisement.campaign.dto.InitiateCampaignPaymentRequest;
@@ -28,6 +32,79 @@ public class AdCampaignService {
     private final AdBudgetRepository adBudgetRepository;
     private final PaymentService paymentService;
     private final AdNotificationService adNotificationService;
+
+    @Transactional(readOnly = true)
+    public Page<AdCampaignManagementResponse> getMyCampaigns(Integer advertiserId, int page, int size) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 100);
+        return adCampaignRepository.findByAdvertiserId(advertiserId,
+                        PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .map(this::toManagementResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public AdCampaignManagementResponse getCampaign(Integer advertiserId, String campaignId) {
+        return toManagementResponse(requireOwnedCampaign(advertiserId, campaignId));
+    }
+
+    @Transactional
+    public AdCampaignManagementResponse pauseCampaign(Integer advertiserId, String campaignId) {
+        AdCampaign campaign = requireOwnedCampaign(advertiserId, campaignId);
+        if (campaign.getStatus() != AdCampaignStatus.ACTIVE && campaign.getStatus() != AdCampaignStatus.SCHEDULED) {
+            throw new IllegalStateException("Only active or scheduled campaigns can be paused");
+        }
+        campaign.setStatus(AdCampaignStatus.PAUSED);
+        return toManagementResponse(adCampaignRepository.save(campaign));
+    }
+
+    @Transactional
+    public AdCampaignManagementResponse resumeCampaign(Integer advertiserId, String campaignId) {
+        AdCampaign campaign = requireOwnedCampaign(advertiserId, campaignId);
+        if (campaign.getStatus() != AdCampaignStatus.PAUSED) {
+            throw new IllegalStateException("Only paused campaigns can be resumed");
+        }
+        if (campaign.getPaymentStatus() != AdPaymentStatus.PAID) {
+            throw new IllegalStateException("Campaign payment must be complete before resuming");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (!campaign.getEndDate().isAfter(now)) {
+            campaign.setStatus(AdCampaignStatus.COMPLETED);
+        } else {
+            campaign.setStatus(campaign.getStartDate().isAfter(now)
+                    ? AdCampaignStatus.SCHEDULED
+                    : AdCampaignStatus.ACTIVE);
+        }
+        return toManagementResponse(adCampaignRepository.save(campaign));
+    }
+
+    private AdCampaign requireOwnedCampaign(Integer advertiserId, String campaignId) {
+        AdCampaign campaign = adCampaignRepository.findById(campaignId)
+                .orElseThrow(() -> new IllegalArgumentException("Campaign not found: " + campaignId));
+        if (!campaign.getAdvertiserId().equals(advertiserId)) {
+            throw new SecurityException("You do not own this campaign");
+        }
+        return campaign;
+    }
+
+    private AdCampaignManagementResponse toManagementResponse(AdCampaign campaign) {
+        AdBudget budget = adBudgetRepository.findByCampaignId(campaign.getId())
+                .orElseThrow(() -> new IllegalStateException("Campaign budget is missing: " + campaign.getId()));
+        return AdCampaignManagementResponse.builder()
+                .campaignId(campaign.getId())
+                .title(campaign.getTitle())
+                .description(campaign.getDescription())
+                .placement(campaign.getPlacement())
+                .status(campaign.getStatus())
+                .paymentStatus(campaign.getPaymentStatus())
+                .startDate(campaign.getStartDate())
+                .endDate(campaign.getEndDate())
+                .totalBudget(budget.getTotalBudget())
+                .spentBudget(budget.getSpentBudget())
+                .remainingBudget(budget.getRemainingBudget())
+                .createdAt(campaign.getCreatedAt())
+                .build();
+    }
 
     @Transactional
     public CampaignResponse createCampaign(Integer advertiserId, CreateCampaignRequest request) {

@@ -1,6 +1,7 @@
 package com.studioos.server.booking.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
@@ -21,7 +22,7 @@ public class BookingResponse {
     private Integer artistId;
     private String artistName;
     private LocalDateTime sessionDate;
-    private Integer durationHours;
+    private List<String> packageServices;
     private Integer attemptCount;
     private Integer productionPackagePrice;
     private Integer totalPrice;

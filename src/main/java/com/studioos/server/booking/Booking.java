@@ -1,10 +1,14 @@
 package com.studioos.server.booking;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import com.studioos.server.shared.enums.BookingPaymentStatus;
 import com.studioos.server.shared.enums.BookingStatus;
@@ -50,8 +54,10 @@ public class Booking {
     @Column(nullable = false)
     private LocalDateTime sessionDate;
 
-    @Column(nullable = false)
-    private Integer durationHours;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "package_services", columnDefinition = "jsonb", nullable = false)
+    @Builder.Default
+    private List<String> packageServices = new ArrayList<>();
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)

@@ -25,6 +25,7 @@ public class StudioResponse {
     private String badge;
     private List<String> genres;
     private List<String> equipment;
+    private List<String> rules;
     private Integer rooms;
     private Integer yearsActive;
     private String responseTime;

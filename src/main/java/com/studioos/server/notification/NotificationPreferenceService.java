@@ -103,6 +103,7 @@ public class NotificationPreferenceService {
             return switch (notificationType) {
                 case BOOKING_REQUEST,
                         BOOKING_CONFIRMED,
+                        BOOKING_PAYMENT_FAILED,
                         BOOKING_CANCELLED,
                         BOOKING_EXPIRED,
                         SERVICE_BOOKING_REQUEST,
@@ -171,6 +172,7 @@ public class NotificationPreferenceService {
         return switch (notificationType) {
             case BOOKING_REQUEST,
                     BOOKING_CONFIRMED,
+                    BOOKING_PAYMENT_FAILED,
                     BOOKING_CANCELLED,
                     BOOKING_EXPIRED,
                     SERVICE_BOOKING_REQUEST,

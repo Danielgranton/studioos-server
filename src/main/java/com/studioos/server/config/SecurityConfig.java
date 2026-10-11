@@ -91,6 +91,7 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.GET, "/ads/serve").permitAll()
                         .requestMatchers(HttpMethod.POST, "/ads/*/click").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/ads/impressions/*/confirm").permitAll()
 
                         // Downloads require login
 

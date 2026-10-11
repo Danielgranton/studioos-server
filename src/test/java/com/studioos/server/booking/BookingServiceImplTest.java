@@ -52,23 +52,44 @@ class BookingServiceImplTest {
         LocalDateTime sessionDate = LocalDateTime.now().plusDays(2);
         User artist = User.builder().id(10).email("artist@example.com").name("Artist").role(Role.ARTIST).build();
         Studio studio = Studio.builder().id("studio-1").ownerId(11).studioName("Room A")
-                .productionPackagePrice(18000).build();
+                .productionPackagePrice(18000).services(List.of(
+                        com.studioos.server.studio.StudioService.builder().name("Recording").active(true).includedInProductionPackage(true).build(),
+                        com.studioos.server.studio.StudioService.builder().name("Beat creation").active(true).includedInProductionPackage(true).build(),
+                        com.studioos.server.studio.StudioService.builder().name("Distribution").active(true).includedInProductionPackage(false).build())).build();
         CreateBookingRequest request = new CreateBookingRequest();
         request.setStudioId("studio-1");
         request.setSessionDate(sessionDate);
-        request.setDurationHours(3);
 
         when(studioRepository.findById("studio-1")).thenReturn(Optional.of(studio));
-        when(bookingRepository.sumExpiredAttempts(10, "studio-1", sessionDate, 3, BookingStatus.EXPIRED)).thenReturn(0L);
-        when(bookingRepository.findByArtistIdAndStudioIdAndSessionDateAndDurationHoursAndStatusOrderByCreatedAtDesc(
-                10, "studio-1", sessionDate, 3, BookingStatus.EXPIRED)).thenReturn(List.of());
-        when(bookingRepository.findConflictingBookings("studio-1", sessionDate, sessionDate.plusHours(3))).thenReturn(List.of());
+        when(bookingRepository.sumExpiredAttempts(10, "studio-1", sessionDate, BookingStatus.EXPIRED)).thenReturn(0L);
+        when(bookingRepository.findByArtistIdAndStudioIdAndSessionDateAndStatusOrderByCreatedAtDesc(
+                10, "studio-1", sessionDate, BookingStatus.EXPIRED)).thenReturn(List.of());
+        when(bookingRepository.findConflictingBookings("studio-1", sessionDate)).thenReturn(List.of());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         BookingResponse response = bookingService.createBooking(artist, request);
 
         org.assertj.core.api.Assertions.assertThat(response.getTotalPrice()).isEqualTo(18000);
         org.assertj.core.api.Assertions.assertThat(response.getProductionPackagePrice()).isEqualTo(18000);
+        org.assertj.core.api.Assertions.assertThat(response.getPackageServices()).containsExactly("Beat creation", "Recording");
+    }
+
+    @Test
+    void bookingRequiresAcceptanceWhenStudioHasRules() {
+        LocalDateTime sessionDate = LocalDateTime.now().plusDays(2);
+        User artist = User.builder().id(10).email("artist@example.com").name("Artist").role(Role.ARTIST).build();
+        Studio studio = Studio.builder().id("studio-1").ownerId(11).studioName("Room A")
+                .productionPackagePrice(18000).rules(List.of("No smoking", "Arrive on time")).build();
+        CreateBookingRequest request = new CreateBookingRequest();
+        request.setStudioId("studio-1");
+        request.setSessionDate(sessionDate);
+        request.setRulesAccepted(false);
+
+        when(studioRepository.findById("studio-1")).thenReturn(Optional.of(studio));
+
+        assertThatThrownBy(() -> bookingService.createBooking(artist, request))
+                .isInstanceOf(StudioosException.class)
+                .hasMessageContaining("accept the studio rules");
     }
 
     @Test
@@ -79,35 +100,33 @@ class BookingServiceImplTest {
         CreateBookingRequest request = new CreateBookingRequest();
         request.setStudioId("studio-1");
         request.setSessionDate(sessionDate);
-        request.setDurationHours(2);
 
         when(studioRepository.findById("studio-1")).thenReturn(Optional.of(studio));
         when(bookingRepository.sumExpiredAttempts(
-                10, "studio-1", sessionDate, 2, BookingStatus.EXPIRED)).thenReturn(2L);
+                10, "studio-1", sessionDate, BookingStatus.EXPIRED)).thenReturn(2L);
 
         assertThatThrownBy(() -> bookingService.createBooking(artist, request))
                 .isInstanceOf(StudioosException.class)
                 .hasMessageContaining("expired twice");
         verify(bookingRepository).sumExpiredAttempts(
-                10, "studio-1", sessionDate, 2, BookingStatus.EXPIRED);
+                10, "studio-1", sessionDate, BookingStatus.EXPIRED);
     }
 
     @Test
     void expiredBookingCanBeEditedAndResubmittedOnce() {
         LocalDateTime nextSession = LocalDateTime.now().plusDays(3);
         Booking booking = Booking.builder().id("booking-1").studioId("studio-1").artistId(10)
-                .sessionDate(LocalDateTime.now().minusDays(1)).durationHours(2).status(BookingStatus.EXPIRED)
+                .sessionDate(LocalDateTime.now().minusDays(1)).status(BookingStatus.EXPIRED)
                 .paymentStatus(BookingPaymentStatus.BOOKED).totalPrice(5000).attemptCount(1).build();
         Studio studio = Studio.builder().id("studio-1").ownerId(11).studioName("Room A").productionPackagePrice(7500).build();
         User artist = User.builder().id(10).email("artist@example.com").name("Artist").role(Role.ARTIST).build();
         UpdateBookingRequest request = new UpdateBookingRequest();
         request.setSessionDate(nextSession);
-        request.setDurationHours(3);
         request.setNotes("Updated session details");
 
         when(bookingRepository.findById("booking-1")).thenReturn(Optional.of(booking));
         when(studioRepository.findById("studio-1")).thenReturn(Optional.of(studio));
-        when(bookingRepository.findConflictingBookings("studio-1", nextSession, nextSession.plusHours(3)))
+        when(bookingRepository.findConflictingBookings("studio-1", nextSession))
                 .thenReturn(List.of());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -122,12 +141,11 @@ class BookingServiceImplTest {
     @Test
     void rejectsRetryAfterBothAttemptsHaveExpired() {
         Booking booking = Booking.builder().id("booking-1").studioId("studio-1").artistId(10)
-                .sessionDate(LocalDateTime.now().minusDays(1)).durationHours(2).status(BookingStatus.EXPIRED)
+                .sessionDate(LocalDateTime.now().minusDays(1)).status(BookingStatus.EXPIRED)
                 .paymentStatus(BookingPaymentStatus.BOOKED).attemptCount(2).build();
         User artist = User.builder().id(10).email("artist@example.com").name("Artist").role(Role.ARTIST).build();
         UpdateBookingRequest request = new UpdateBookingRequest();
         request.setSessionDate(LocalDateTime.now().plusDays(3));
-        request.setDurationHours(2);
 
         when(bookingRepository.findById("booking-1")).thenReturn(Optional.of(booking));
 
@@ -145,7 +163,6 @@ class BookingServiceImplTest {
                 .status(BookingStatus.APPROVED)
                 .paymentStatus(BookingPaymentStatus.PAID)
                 .sessionDate(LocalDateTime.now().plusDays(1))
-                .durationHours(2)
                 .totalPrice(5000)
                 .build();
         Studio studio = Studio.builder().id("studio-1").ownerId(11).studioName("Room A").build();
@@ -170,7 +187,6 @@ class BookingServiceImplTest {
                 .status(BookingStatus.PENDING)
                 .paymentStatus(BookingPaymentStatus.BOOKED)
                 .sessionDate(LocalDateTime.now().plusDays(1))
-                .durationHours(2)
                 .build();
         Studio studio = Studio.builder().id("studio-1").ownerId(11).studioName("Room A").build();
         User otherUser = User.builder().id(99).email("other@example.com").name("Other").role(Role.USER).build();
@@ -191,7 +207,6 @@ class BookingServiceImplTest {
                 .status(BookingStatus.RECORDING)
                 .paymentStatus(BookingPaymentStatus.PAID)
                 .sessionDate(LocalDateTime.now().plusDays(1))
-                .durationHours(2)
                 .build();
         Studio studio = Studio.builder().id("studio-1").ownerId(11).studioName("Room A").build();
         User artist = User.builder().id(10).email("artist@example.com").name("Artist").role(Role.ARTIST).build();

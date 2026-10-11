@@ -26,31 +26,28 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     @EntityGraph(attributePaths = "artist")
     Page<Booking> findByArtistId(Integer artistId, Pageable pageable);
 
-    // Find bookings for a studio within a date range (for availability check)
+    // Without duration-based reservations, only identical requested start times conflict.
     @Query(value = "SELECT * FROM bookings b WHERE b.studio_id = :studioId " +
            "AND b.status NOT IN ('CANCELLED', 'EXPIRED') " +
-           "AND b.session_date < :endDate " +
-           "AND b.session_date + (b.duration_hours * INTERVAL '1 hour') > :startDate", nativeQuery = true)
-    List<Booking> findConflictingBookings(String studioId, LocalDateTime startDate, LocalDateTime endDate);
+           "AND b.session_date = :sessionDate", nativeQuery = true)
+    List<Booking> findConflictingBookings(String studioId, LocalDateTime sessionDate);
 
     // Find pending bookings (awaiting confirmation)
     List<Booking> findByStudioIdAndStatus(String studioId, BookingStatus status);
 
-    List<Booking> findByArtistIdAndStudioIdAndSessionDateAndDurationHoursAndStatusOrderByCreatedAtDesc(
+    List<Booking> findByArtistIdAndStudioIdAndSessionDateAndStatusOrderByCreatedAtDesc(
             Integer artistId,
             String studioId,
             LocalDateTime sessionDate,
-            Integer durationHours,
             BookingStatus status);
 
     @Query("SELECT COALESCE(SUM(b.attemptCount), 0L) FROM Booking b " +
            "WHERE b.artistId = :artistId AND b.studioId = :studioId " +
-           "AND b.sessionDate = :sessionDate AND b.durationHours = :durationHours AND b.status = :status")
+           "AND b.sessionDate = :sessionDate AND b.status = :status")
     long sumExpiredAttempts(
             Integer artistId,
             String studioId,
             LocalDateTime sessionDate,
-            Integer durationHours,
             BookingStatus status);
 
     List<Booking> findByStatusAndPaymentStatusAndUpdatedAtBefore(BookingStatus status, BookingPaymentStatus paymentStatus, LocalDateTime updatedAtBefore);

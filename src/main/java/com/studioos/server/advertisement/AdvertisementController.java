@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import com.studioos.server.advertisement.campaign.AdCampaignService;
 import com.studioos.server.advertisement.campaign.AdCampaignReportService;
 import com.studioos.server.advertisement.campaign.dto.CampaignPaymentInitiationResponse;
+import com.studioos.server.advertisement.campaign.dto.AdCampaignManagementResponse;
 import com.studioos.server.advertisement.campaign.dto.AdCampaignReportResponse;
 import com.studioos.server.advertisement.campaign.dto.CampaignResponse;
 import com.studioos.server.advertisement.campaign.dto.CreateCampaignRequest;
@@ -13,7 +14,10 @@ import com.studioos.server.advertisement.campaign.dto.InitiateCampaignPaymentReq
 import com.studioos.server.advertisement.dto.AdUploadCompleteResponse;
 import com.studioos.server.advertisement.dto.AdUploadSessionResponse;
 import com.studioos.server.advertisement.dto.CreateAdvertisementRequest;
+import com.studioos.server.advertisement.dto.AdvertisementManagementResponse;
 import com.studioos.server.user.User;
+import org.springframework.data.domain.Page;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +30,47 @@ public class AdvertisementController {
     private final AdCampaignService adCampaignService;
     private final AdCampaignReportService adCampaignReportService;
     private final AdvertisementUploadService advertisementUploadService;
+
+    @GetMapping("/campaigns")
+    @PreAuthorize("hasRole('PRODUCER')")
+    public Page<AdCampaignManagementResponse> myCampaigns(
+            @AuthenticationPrincipal User advertiser,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return adCampaignService.getMyCampaigns(advertiser.getId(), page, size);
+    }
+
+    @GetMapping("/campaigns/{campaignId}")
+    @PreAuthorize("hasRole('PRODUCER')")
+    public AdCampaignManagementResponse campaign(
+            @AuthenticationPrincipal User advertiser,
+            @PathVariable String campaignId) {
+        return adCampaignService.getCampaign(advertiser.getId(), campaignId);
+    }
+
+    @GetMapping("/campaigns/{campaignId}/advertisements")
+    @PreAuthorize("hasRole('PRODUCER')")
+    public java.util.List<AdvertisementManagementResponse> campaignAdvertisements(
+            @AuthenticationPrincipal User advertiser,
+            @PathVariable String campaignId) {
+        return advertisementUploadService.getCampaignAdvertisements(advertiser.getId(), campaignId);
+    }
+
+    @PatchMapping("/campaigns/{campaignId}/pause")
+    @PreAuthorize("hasRole('PRODUCER')")
+    public AdCampaignManagementResponse pauseCampaign(
+            @AuthenticationPrincipal User advertiser,
+            @PathVariable String campaignId) {
+        return adCampaignService.pauseCampaign(advertiser.getId(), campaignId);
+    }
+
+    @PatchMapping("/campaigns/{campaignId}/resume")
+    @PreAuthorize("hasRole('PRODUCER')")
+    public AdCampaignManagementResponse resumeCampaign(
+            @AuthenticationPrincipal User advertiser,
+            @PathVariable String campaignId) {
+        return adCampaignService.resumeCampaign(advertiser.getId(), campaignId);
+    }
 
     @PostMapping("/campaigns")
     public CampaignResponse createCampaign(

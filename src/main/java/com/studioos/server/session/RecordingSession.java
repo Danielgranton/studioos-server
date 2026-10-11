@@ -50,7 +50,6 @@ public class RecordingSession {
     @Column(nullable = false)
     private LocalDateTime scheduledStart;
 
-    @Column(nullable = false)
     private LocalDateTime scheduledEnd;
 
     private LocalDateTime actualStart;

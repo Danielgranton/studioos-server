@@ -1,6 +1,7 @@
 package com.studioos.server.booking;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.context.ApplicationEventPublisher;
@@ -28,6 +29,7 @@ import com.studioos.server.shared.enums.Role;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.studio.Studio;
 import com.studioos.server.studio.StudioRepository;
+import com.studioos.server.studio.StudioService;
 import com.studioos.server.user.User;
 
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,8 @@ import lombok.extern.slf4j.Slf4j;
 public class BookingServiceImpl {
 
     private static final long MAX_EXPIRED_ATTEMPTS_PER_SESSION = 2;
+    private static final List<String> PRODUCTION_STAGE_ORDER = List.of(
+            "Beat creation", "Recording", "Mixing", "Mastering");
 
     private final BookingRepository bookingRepository;
     private final StudioRepository studioRepository;
@@ -56,6 +60,11 @@ public class BookingServiceImpl {
         Studio studio = studioRepository.findById(request.getStudioId())
                 .orElseThrow(() -> StudioosException.notFound("Studio not found"));
 
+        if (studio.getRules() != null && !studio.getRules().isEmpty()
+                && !Boolean.TRUE.equals(request.getRulesAccepted())) {
+            throw StudioosException.badRequest("Read and accept the studio rules before requesting a booking");
+        }
+
         if (!studio.isAvailable()) {
             throw StudioosException.badRequest("This studio is not currently accepting bookings");
         }
@@ -71,24 +80,20 @@ public class BookingServiceImpl {
                 currentUser.getId(),
                 request.getStudioId(),
                 request.getSessionDate(),
-                request.getDurationHours(),
                 BookingStatus.EXPIRED);
         if (expiredAttempts >= MAX_EXPIRED_ATTEMPTS_PER_SESSION) {
             throw StudioosException.conflict("This session has expired twice. You cannot request this same session time again.");
         }
         List<Booking> expiredMatches = bookingRepository
-                .findByArtistIdAndStudioIdAndSessionDateAndDurationHoursAndStatusOrderByCreatedAtDesc(
+                .findByArtistIdAndStudioIdAndSessionDateAndStatusOrderByCreatedAtDesc(
                         currentUser.getId(),
                         request.getStudioId(),
                         request.getSessionDate(),
-                        request.getDurationHours(),
                         BookingStatus.EXPIRED);
 
-        LocalDateTime endDate = request.getSessionDate().plusHours(request.getDurationHours());
         List<Booking> conflicts = bookingRepository.findConflictingBookings(
                 request.getStudioId(),
-                request.getSessionDate(),
-                endDate
+                request.getSessionDate()
         );
         if (!conflicts.isEmpty()) {
             throw StudioosException.badRequest("Studio is not available for the requested time slot");
@@ -100,6 +105,7 @@ public class BookingServiceImpl {
             retry.setAttemptCount(retry.getAttemptCount() + 1);
             retry.setTotalPrice(packagePrice);
             retry.setNotes(request.getNotes());
+            retry.setPackageServices(snapshotPackageServices(studio));
             bookingRepository.save(retry);
             applicationEventPublisher.publishEvent(BookingCreatedEvent.builder()
                     .bookingId(retry.getId())
@@ -113,7 +119,7 @@ public class BookingServiceImpl {
                 .studioId(request.getStudioId())
                 .artistId(currentUser.getId())
                 .sessionDate(request.getSessionDate())
-                .durationHours(request.getDurationHours())
+                .packageServices(snapshotPackageServices(studio))
                 .attemptCount(1)
                 .notes(request.getNotes())
                 .totalPrice(packagePrice)
@@ -163,8 +169,7 @@ public class BookingServiceImpl {
             throw StudioosException.conflict("This studio has not set a production package price");
         }
 
-        LocalDateTime endDate = request.getSessionDate().plusHours(request.getDurationHours());
-        boolean conflicts = bookingRepository.findConflictingBookings(booking.getStudioId(), request.getSessionDate(), endDate)
+        boolean conflicts = bookingRepository.findConflictingBookings(booking.getStudioId(), request.getSessionDate())
                 .stream()
                 .anyMatch(existing -> !existing.getId().equals(bookingId));
         if (conflicts) {
@@ -172,12 +177,12 @@ public class BookingServiceImpl {
         }
 
         booking.setSessionDate(request.getSessionDate());
-        booking.setDurationHours(request.getDurationHours());
         booking.setNotes(request.getNotes());
         if (isRetry) {
             booking.setAttemptCount(booking.getAttemptCount() + 1);
             booking.setStatus(BookingStatus.PENDING);
             booking.setTotalPrice(currentPackagePrice);
+            booking.setPackageServices(snapshotPackageServices(studio));
         }
         bookingRepository.save(booking);
         if (isRetry) {
@@ -345,7 +350,7 @@ public class BookingServiceImpl {
                 .artistId(booking.getArtistId())
                 .artistName(artist != null ? artist.getName() : null)
                 .sessionDate(booking.getSessionDate())
-                .durationHours(booking.getDurationHours())
+                .packageServices(booking.getPackageServices() != null ? booking.getPackageServices() : List.of())
                 .attemptCount(booking.getAttemptCount())
                 .productionPackagePrice(booking.getTotalPrice() != null ? booking.getTotalPrice()
                         : studio != null ? studio.getProductionPackagePrice() : null)
@@ -355,5 +360,20 @@ public class BookingServiceImpl {
                 .notes(booking.getNotes())
                 .createdAt(booking.getCreatedAt())
                 .build();
+    }
+
+    private List<String> snapshotPackageServices(Studio studio) {
+        return studio.getServices().stream()
+                .filter(service -> service.isActive() && service.isIncludedInProductionPackage())
+                .map(StudioService::getName)
+                .filter(name -> name != null && !name.isBlank())
+                .distinct()
+                .sorted(Comparator
+                        .comparingInt((String name) -> {
+                            int index = PRODUCTION_STAGE_ORDER.indexOf(name);
+                            return index < 0 ? PRODUCTION_STAGE_ORDER.size() : index;
+                        })
+                        .thenComparing(String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 }

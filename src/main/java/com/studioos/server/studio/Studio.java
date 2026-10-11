@@ -57,6 +57,11 @@ public class Studio {
     @Builder.Default
     private List<String> equipment = new ArrayList<>();
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", nullable = false)
+    @Builder.Default
+    private List<String> rules = new ArrayList<>();
+
     private Integer rooms;
     private Integer yearsActive;
     private String responseTime;

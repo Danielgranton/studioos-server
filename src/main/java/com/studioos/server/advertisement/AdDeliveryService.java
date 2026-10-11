@@ -1,10 +1,13 @@
 package com.studioos.server.advertisement;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +21,7 @@ import com.studioos.server.advertisement.pricing.AdvertisementPricing;
 import com.studioos.server.advertisement.pricing.AdvertisementPricingRepository;
 import com.studioos.server.shared.enums.AdCampaignStatus;
 import com.studioos.server.shared.enums.AdCreativeStatus;
+import com.studioos.server.shared.enums.AdImpressionVerificationStatus;
 import com.studioos.server.shared.enums.AdPlacement;
 import com.studioos.server.shared.storage.PresignedUrlService;
 
@@ -27,7 +31,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AdDeliveryService {
 
-    private static final String MEDIA_BUCKET = "studioos-media";
     private static final int SIGNED_URL_EXPIRY_SECONDS = 300;
     private static final int MAX_IMPRESSIONS_PER_HOUR = 3;
     private static final int REPEAT_COOLDOWN_MINUTES = 30;
@@ -37,8 +40,12 @@ public class AdDeliveryService {
     private final AdvertisementRepository advertisementRepository;
     private final AdvertisementPricingRepository advertisementPricingRepository;
     private final AdImpressionRepository adImpressionRepository;
+    private final AdImpressionVerificationRepository adImpressionVerificationRepository;
     private final PresignedUrlService presignedUrlService;
     private final TargetingService targetingService;
+
+    @Value("${storage.s3.bucket}")
+    private String mediaBucket;
 
     @Transactional
     public Optional<AdDeliveryResponse> selectAdvertisement(AdPlacement placement, Integer userId) {
@@ -62,11 +69,18 @@ public class AdDeliveryService {
         }
 
         EligibleAd chosen = eligible.get(ThreadLocalRandom.current().nextInt(eligible.size()));
+        String impressionToken = UUID.randomUUID().toString();
+        adImpressionVerificationRepository.save(AdImpressionVerification.builder()
+                .token(impressionToken)
+                .advertisementId(chosen.ad().getId())
+                .campaignId(chosen.campaign().getId())
+                .userId(userId)
+                .placement(placement)
+                .status(AdImpressionVerificationStatus.PENDING)
+                .expiresAt(now.plus(Duration.ofMinutes(5)))
+                .build());
 
-        chargeImpression(chosen);
-        recordImpression(chosen, placement, userId);
-
-        return Optional.of(toResponse(chosen));
+        return Optional.of(toResponse(chosen, impressionToken));
     }
 
     private Optional<EligibleAd> resolveEligibleAd(AdCampaign campaign, Integer userId, LocalDateTime now) {
@@ -91,12 +105,12 @@ public class AdDeliveryService {
             return Optional.empty();
         }
 
-        double costPerImpression = pricing.getFinalCpm() / 1000.0;
+        int costPerImpression = (int) Math.ceil(pricing.getFinalCpm() / 1000.0);
         if (budget.getRemainingBudget() < costPerImpression) {
             return Optional.empty(); // budget exhausted — excluded entirely, not partially served
         }
 
-        return Optional.of(new EligibleAd(campaign, ad, budget, costPerImpression));
+        return Optional.of(new EligibleAd(campaign, ad, budget));
     }
 
     private boolean isFrequencyCapped(Advertisement ad, Integer userId, LocalDateTime now) {
@@ -112,38 +126,19 @@ public class AdDeliveryService {
                 .countByAdvertisementIdAndUserIdAndOccurredAtAfter(ad.getId(), userId, cooldownCutoff) > 0;
     }
 
-    private void chargeImpression(EligibleAd chosen) {
-        AdBudget budget = chosen.budget();
-        int cost = (int) Math.ceil(chosen.costPerImpression());
-        budget.setRemainingBudget(budget.getRemainingBudget() - cost);
-        budget.setSpentBudget(budget.getSpentBudget() + cost);
-        adBudgetRepository.save(budget);
-    }
-
-    private void recordImpression(EligibleAd chosen, AdPlacement placement, Integer userId) {
-        AdImpression impression = AdImpression.builder()
-                .advertisementId(chosen.ad().getId())
-                .campaignId(chosen.campaign().getId())
-                .userId(userId)
-                .placement(placement)
-                .build();
-        adImpressionRepository.save(impression);
-
-        chosen.ad(); // no-op, kept for clarity that ad itself isn't mutated here
-    }
-
-    private AdDeliveryResponse toResponse(EligibleAd chosen) {
+    private AdDeliveryResponse toResponse(EligibleAd chosen, String impressionToken) {
         Advertisement ad = chosen.ad();
 
         String signedMediaUrl = ad.getMediaUrl() != null
-                ? presignedUrlService.generateDownloadUrl(MEDIA_BUCKET, ad.getMediaUrl(), SIGNED_URL_EXPIRY_SECONDS)
+                ? presignedUrlService.generateDownloadUrl(mediaBucket, objectKeyForConfiguredBucket(ad.getMediaUrl()), SIGNED_URL_EXPIRY_SECONDS)
                 : null;
         String signedThumbnailUrl = ad.getThumbnailUrl() != null
-                ? presignedUrlService.generateDownloadUrl(MEDIA_BUCKET, ad.getThumbnailUrl(), SIGNED_URL_EXPIRY_SECONDS)
+                ? presignedUrlService.generateDownloadUrl(mediaBucket, objectKeyForConfiguredBucket(ad.getThumbnailUrl()), SIGNED_URL_EXPIRY_SECONDS)
                 : null;
 
         return AdDeliveryResponse.builder()
                 .advertisementId(ad.getId())
+                .impressionToken(impressionToken)
                 .type(ad.getType().name())
                 .headline(ad.getHeadline())
                 .ctaText(ad.getCtaText())
@@ -153,5 +148,25 @@ public class AdDeliveryService {
                 .build();
     }
 
-    private record EligibleAd(AdCampaign campaign, Advertisement ad, AdBudget budget, double costPerImpression) {}
+    private String objectKeyForConfiguredBucket(String mediaReference) {
+        String reference = mediaReference.trim();
+        if (reference.startsWith("s3://")) {
+            String bucketAndKey = reference.substring("s3://".length());
+            int separator = bucketAndKey.indexOf('/');
+            if (separator <= 0 || separator == bucketAndKey.length() - 1) {
+                throw new IllegalStateException("Ad media reference must include an S3 bucket and object key");
+            }
+            String referencedBucket = bucketAndKey.substring(0, separator);
+            if (!referencedBucket.equals(mediaBucket)) {
+                throw new IllegalStateException("Ad media reference bucket does not match configured storage bucket");
+            }
+            return bucketAndKey.substring(separator + 1);
+        }
+        if (reference.isBlank()) {
+            throw new IllegalStateException("Ad media object key cannot be blank");
+        }
+        return reference.replaceFirst("^/+", "");
+    }
+
+    private record EligibleAd(AdCampaign campaign, Advertisement ad, AdBudget budget) {}
 }

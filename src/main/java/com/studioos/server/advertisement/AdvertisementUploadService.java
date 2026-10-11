@@ -14,6 +14,7 @@ import com.studioos.server.advertisement.campaign.AdCampaign;
 import com.studioos.server.advertisement.campaign.AdCampaignRepository;
 import com.studioos.server.advertisement.dto.AdMediaJobCallbackRequest;
 import com.studioos.server.advertisement.dto.AdUploadCompleteResponse;
+import com.studioos.server.advertisement.dto.AdvertisementManagementResponse;
 import com.studioos.server.advertisement.dto.AdUploadSessionResponse;
 import com.studioos.server.advertisement.dto.CreateAdvertisementRequest;
 import com.studioos.server.advertisement.pricing.AdvertisementPriceResult;
@@ -49,6 +50,31 @@ public class AdvertisementUploadService {
     private final MediaProcessingClient mediaProcessingClient;
     @Value("${storage.s3.bucket}")
     private String mediaBucket;
+
+    @Transactional(readOnly = true)
+    public List<AdvertisementManagementResponse> getCampaignAdvertisements(Integer advertiserId, String campaignId) {
+        AdCampaign campaign = adCampaignRepository.findById(campaignId)
+                .orElseThrow(() -> new IllegalArgumentException("Campaign not found: " + campaignId));
+        if (!campaign.getAdvertiserId().equals(advertiserId)) {
+            throw new SecurityException("You do not own this campaign");
+        }
+        return advertisementRepository.findByCampaignIdOrderByCreatedAtDesc(campaignId).stream()
+                .map(ad -> AdvertisementManagementResponse.builder()
+                        .advertisementId(ad.getId())
+                        .campaignId(ad.getCampaignId())
+                        .type(ad.getType())
+                        .headline(ad.getHeadline())
+                        .description(ad.getDescription())
+                        .ctaText(ad.getCtaText())
+                        .ctaUrl(ad.getCtaUrl())
+                        .mediaUrl(ad.getMediaUrl())
+                        .thumbnailUrl(ad.getThumbnailUrl())
+                        .duration(ad.getDuration())
+                        .status(ad.getStatus())
+                        .createdAt(ad.getCreatedAt())
+                        .build())
+                .toList();
+    }
 
     @Transactional
     public AdUploadSessionResponse createAdvertisementAndUploadSession(
@@ -201,6 +227,7 @@ public class AdvertisementUploadService {
     }
 
     private void submitProcessingJobs(Advertisement ad, AdUploadSession session) {
+        String assetReference = toS3Reference(session.getBucket(), session.getObjectKey());
         List<AdMediaJobOperation> operations = switch (ad.getType()) {
             case IMAGE -> List.of(AdMediaJobOperation.IMAGE_RESIZE, AdMediaJobOperation.IMAGE_THUMBNAIL, AdMediaJobOperation.IMAGE_WEBP);
             case VIDEO -> List.of(AdMediaJobOperation.VIDEO_COMPRESS, AdMediaJobOperation.VIDEO_THUMBNAIL);
@@ -208,7 +235,7 @@ public class AdvertisementUploadService {
         };
 
         for (AdMediaJobOperation op : operations) {
-            String externalJobId = mediaProcessingClient.submitJob(session.getObjectKey(), op.getOperationString(), "{}");
+            String externalJobId = mediaProcessingClient.submitJob(assetReference, op.getOperationString(), "{}");
 
             AdMediaProcessingJob job = AdMediaProcessingJob.builder()
                     .advertisementId(ad.getId())
@@ -219,6 +246,13 @@ public class AdvertisementUploadService {
 
             adMediaProcessingJobRepository.save(job);
         }
+    }
+
+    private String toS3Reference(String bucket, String objectKey) {
+        if (bucket == null || bucket.isBlank() || objectKey == null || objectKey.isBlank()) {
+            throw new IllegalStateException("Ad upload session is missing its S3 bucket or object key");
+        }
+        return "s3://%s/%s".formatted(bucket.trim(), objectKey.replaceFirst("^/+", ""));
     }
 
     @Transactional

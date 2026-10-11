@@ -9,6 +9,7 @@ import lombok.Data;
 @AllArgsConstructor
 public class AdDeliveryResponse {
     private String advertisementId;
+    private String impressionToken;
     private String type;
     private String headline;
     private String ctaText;
