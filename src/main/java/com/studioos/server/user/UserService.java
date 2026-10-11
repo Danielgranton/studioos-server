@@ -5,11 +5,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.beans.factory.annotation.Value;
 
+import com.studioos.server.beatmarketplace.BeatRepository;
+import com.studioos.server.booking.BookingRepository;
+import com.studioos.server.engagement.EngagementAction;
+import com.studioos.server.engagement.EngagementEdgeRepository;
+import com.studioos.server.engagement.EngagementTargetType;
 import com.studioos.server.shared.exceptions.StudioosException;
 import com.studioos.server.shared.audit.AccountAuditService;
 import com.studioos.server.shared.enums.AuditEventType;
 import com.studioos.server.shared.enums.AvailabilityStatus;
 import com.studioos.server.shared.enums.VerificationStatus;
+import com.studioos.server.shared.enums.BookingPaymentStatus;
+import com.studioos.server.shared.enums.BookingStatus;
 import com.studioos.server.shared.media.ResponsiveImageAsset;
 import com.studioos.server.shared.storage.PresignedUrlService;
 import com.studioos.server.auth.service.ProfileImageServiceClient;
@@ -40,6 +47,9 @@ public class UserService {
     private final ProducerSearchIndexingService producerSearchIndexingService;
     private final StudioRepository studioRepository;
     private final StudioSearchIndexingService studioSearchIndexingService;
+    private final EngagementEdgeRepository engagementEdgeRepository;
+    private final BeatRepository beatRepository;
+    private final BookingRepository bookingRepository;
 
     @Value("${storage.s3.profile-url-expiry-seconds:3600}")
     private int profileUrlExpirySeconds;
@@ -204,7 +214,7 @@ public class UserService {
 
     private PublicUserResponse toPublicResponse(User user) {
         PrivacySettings privacy = privacySettingsService.getEntityOrDefaults(user.getId());
-        return PublicUserResponse.builder()
+        PublicUserResponse.PublicUserResponseBuilder response = PublicUserResponse.builder()
                 .id(user.getId())
                 .name(user.getName())
                 .username(user.getUsername())
@@ -223,8 +233,16 @@ public class UserService {
                 .profileImageThumbnail(resolveImageUrl(user.getProfileImageThumbnail()))
                 .instagram(user.getInstagram())
                 .youtube(user.getYoutube())
-                .link(user.getLink())
-                .build();
+                .link(user.getLink());
+        if (user.getRole() == com.studioos.server.shared.enums.Role.PRODUCER) {
+            response
+                    .followerCount(engagementEdgeRepository.countByTargetTypeAndTargetIdAndAction(
+                            EngagementTargetType.USER, String.valueOf(user.getId()), EngagementAction.FOLLOW))
+                    .producedCount(bookingRepository.countByProducerIdAndStatusAndPaymentStatus(
+                            user.getId(), BookingStatus.DELIVERED, BookingPaymentStatus.PAID))
+                    .beatCount(beatRepository.countByProducerId(user.getId()));
+        }
+        return response.build();
     }
 
     private void applyProfileImage(User user, String profileImageReference) {

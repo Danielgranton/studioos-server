@@ -48,18 +48,19 @@ public class ProducerSearchIndexingService {
                     .map(Studio::getStudioName)
                     .filter(Objects::nonNull)
                     .toList();
-            List<String> services = studios.stream()
-                    .flatMap(studio -> studio.getServices().stream())
+            Studio packageStudio = studios.stream()
+                    .filter(studio -> studio.getProductionPackagePrice() != null)
+                    .min(Comparator.comparing(Studio::getProductionPackagePrice))
+                    .orElse(studios.isEmpty() ? null : studios.get(0));
+            List<String> services = packageStudio == null ? List.of() : packageStudio.getServices().stream()
+                    .filter(service -> service.isActive() && service.isIncludedInProductionPackage())
                     .map(service -> service.getName())
                     .filter(Objects::nonNull)
                     .distinct()
+                    .sorted(Comparator.comparingInt(ProducerSearchIndexingService::productionStageOrder))
                     .limit(6)
                     .toList();
-            Integer startingPrice = studios.stream()
-                    .map(Studio::getPricing)
-                    .filter(Objects::nonNull)
-                    .min(Comparator.naturalOrder())
-                    .orElse(null);
+            Integer startingPrice = packageStudio == null ? null : packageStudio.getProductionPackagePrice();
             String responseTime = studios.stream()
                     .map(Studio::getResponseTime)
                     .filter(value -> value != null && !value.isBlank())
@@ -85,5 +86,14 @@ public class ProducerSearchIndexingService {
         } catch (Exception e) {
             log.error("Failed to index producer {} in OpenSearch: {}", producer.getId(), e.getMessage());
         }
+    }
+
+    private static int productionStageOrder(String serviceName) {
+        String name = serviceName.trim().toLowerCase(java.util.Locale.ROOT);
+        if (name.startsWith("beat creation") || name.startsWith("beat production") || name.startsWith("beat making")) return 0;
+        if (name.startsWith("recording")) return 1;
+        if (name.startsWith("mixing")) return 2;
+        if (name.startsWith("mastering")) return 3;
+        return 4;
     }
 }

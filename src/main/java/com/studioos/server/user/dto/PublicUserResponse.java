@@ -33,4 +33,7 @@ public class PublicUserResponse {
     private String instagram;
     private String youtube;
     private String link;
+    private Long followerCount;
+    private Long producedCount;
+    private Long beatCount;
 }
