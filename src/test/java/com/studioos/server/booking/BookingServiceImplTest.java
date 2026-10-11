@@ -48,10 +48,34 @@ class BookingServiceImplTest {
     private BookingServiceImpl bookingService;
 
     @Test
+    void bookingUsesAndCapturesTheStudioPackagePrice() {
+        LocalDateTime sessionDate = LocalDateTime.now().plusDays(2);
+        User artist = User.builder().id(10).email("artist@example.com").name("Artist").role(Role.ARTIST).build();
+        Studio studio = Studio.builder().id("studio-1").ownerId(11).studioName("Room A")
+                .productionPackagePrice(18000).build();
+        CreateBookingRequest request = new CreateBookingRequest();
+        request.setStudioId("studio-1");
+        request.setSessionDate(sessionDate);
+        request.setDurationHours(3);
+
+        when(studioRepository.findById("studio-1")).thenReturn(Optional.of(studio));
+        when(bookingRepository.sumExpiredAttempts(10, "studio-1", sessionDate, 3, BookingStatus.EXPIRED)).thenReturn(0L);
+        when(bookingRepository.findByArtistIdAndStudioIdAndSessionDateAndDurationHoursAndStatusOrderByCreatedAtDesc(
+                10, "studio-1", sessionDate, 3, BookingStatus.EXPIRED)).thenReturn(List.of());
+        when(bookingRepository.findConflictingBookings("studio-1", sessionDate, sessionDate.plusHours(3))).thenReturn(List.of());
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BookingResponse response = bookingService.createBooking(artist, request);
+
+        org.assertj.core.api.Assertions.assertThat(response.getTotalPrice()).isEqualTo(18000);
+        org.assertj.core.api.Assertions.assertThat(response.getProductionPackagePrice()).isEqualTo(18000);
+    }
+
+    @Test
     void rejectsThirdAttemptForSameSessionAfterTwoExpiries() {
         LocalDateTime sessionDate = LocalDateTime.now().plusDays(2);
         User artist = User.builder().id(10).email("artist@example.com").name("Artist").role(Role.ARTIST).build();
-        Studio studio = Studio.builder().id("studio-1").ownerId(11).studioName("Room A").build();
+        Studio studio = Studio.builder().id("studio-1").ownerId(11).studioName("Room A").productionPackagePrice(18000).build();
         CreateBookingRequest request = new CreateBookingRequest();
         request.setStudioId("studio-1");
         request.setSessionDate(sessionDate);
@@ -74,7 +98,7 @@ class BookingServiceImplTest {
         Booking booking = Booking.builder().id("booking-1").studioId("studio-1").artistId(10)
                 .sessionDate(LocalDateTime.now().minusDays(1)).durationHours(2).status(BookingStatus.EXPIRED)
                 .paymentStatus(BookingPaymentStatus.BOOKED).totalPrice(5000).attemptCount(1).build();
-        Studio studio = Studio.builder().id("studio-1").ownerId(11).studioName("Room A").build();
+        Studio studio = Studio.builder().id("studio-1").ownerId(11).studioName("Room A").productionPackagePrice(7500).build();
         User artist = User.builder().id(10).email("artist@example.com").name("Artist").role(Role.ARTIST).build();
         UpdateBookingRequest request = new UpdateBookingRequest();
         request.setSessionDate(nextSession);
@@ -91,7 +115,7 @@ class BookingServiceImplTest {
 
         org.assertj.core.api.Assertions.assertThat(response.getStatus()).isEqualTo(BookingStatus.PENDING);
         org.assertj.core.api.Assertions.assertThat(response.getAttemptCount()).isEqualTo(2);
-        org.assertj.core.api.Assertions.assertThat(response.getTotalPrice()).isNull();
+        org.assertj.core.api.Assertions.assertThat(response.getTotalPrice()).isEqualTo(7500);
         verify(applicationEventPublisher).publishEvent(any(BookingCreatedEvent.class));
     }
 

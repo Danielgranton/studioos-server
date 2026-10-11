@@ -67,14 +67,13 @@ public class ServiceCatalogService {
                                 || serviceNameAliases(service).contains(offer.getName().trim().toLowerCase(Locale.ROOT))))
                         .findFirst().orElse(null);
                 if (matchingOffer == null) continue;
-                Integer listedPrice = matchingOffer.isIncludedInProductionPackage()
-                        ? studio.getProductionPackagePrice() : matchingOffer.getPrice();
+                Integer listedPrice = studio.getProductionPackagePrice();
                 userRepository.findById(studio.getOwnerId()).ifPresent(producer -> providers.add(new ServiceProviderResponse(
                         "PRODUCER", String.valueOf(producer.getId()), producer.getName(), producer.getLocation(), profileImage(producer),
                         service.getName(), studio.getDescription(), listedPrice, "KES",
                         studio.isVerified() || producer.getVerificationStatus() != null && producer.getVerificationStatus().name().equals("VERIFIED"),
                         studio.getId(), studio.getId(), service.getId(),
-                        matchingOffer.isIncludedInProductionPackage() ? "PRODUCTION_PACKAGE" : "ADD_ON")));
+                        "PRODUCTION_PACKAGE")));
             }
         }
         return providers;

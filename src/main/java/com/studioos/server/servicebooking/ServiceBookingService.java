@@ -65,7 +65,7 @@ public class ServiceBookingService {
             if (!studio.getOwnerId().equals(request.getProviderId()) || !studio.isAvailable() || offer == null) {
                 throw StudioosException.notFound("Studio service is no longer available");
             }
-            amount = offer.isIncludedInProductionPackage() ? studio.getProductionPackagePrice() : offer.getPrice();
+            amount = studio.getProductionPackagePrice();
             if (amount == null || amount < 1) {
                 throw StudioosException.conflict("This provider has not set a price for the selected service");
             }

@@ -23,8 +23,8 @@ public final class StudioSpecifications {
             if (maxPrice == null) {
                 return cb.conjunction();
             }
-            Predicate hasPrice = cb.isNotNull(root.get("pricing"));
-            Predicate withinBudget = cb.lessThanOrEqualTo(root.get("pricing"), maxPrice);
+            Predicate hasPrice = cb.isNotNull(root.get("productionPackagePrice"));
+            Predicate withinBudget = cb.lessThanOrEqualTo(root.get("productionPackagePrice"), maxPrice);
             return cb.and(hasPrice, withinBudget);
         };
     }

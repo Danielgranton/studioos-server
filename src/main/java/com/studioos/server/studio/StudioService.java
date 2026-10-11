@@ -38,7 +38,7 @@ public class StudioService {
 
     @Column(name = "included_in_production_package", nullable = false)
     @Builder.Default
-    private boolean includedInProductionPackage = false;
+    private boolean includedInProductionPackage = true;
 
     @Column(name = "service_price")
     private Integer price;

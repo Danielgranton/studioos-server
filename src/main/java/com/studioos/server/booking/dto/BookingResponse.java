@@ -23,6 +23,7 @@ public class BookingResponse {
     private LocalDateTime sessionDate;
     private Integer durationHours;
     private Integer attemptCount;
+    private Integer productionPackagePrice;
     private Integer totalPrice;
     private BookingStatus status;
     private BookingPaymentStatus paymentStatus;

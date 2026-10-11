@@ -86,7 +86,7 @@ public class StudioServiceImpl {
                     .location(currentUser.getLocation() != null && !currentUser.getLocation().isBlank()
                             ? currentUser.getLocation()
                             : request.getLocation())
-                    .pricing(request.getPricing())
+                    .pricing(request.getProductionPackagePrice())
                     .productionPackagePrice(request.getProductionPackagePrice())
                     .availability(request.getAvailability())
                     .description(request.getDescription())
@@ -129,8 +129,10 @@ public class StudioServiceImpl {
         if (studio.getOwner() != null && studio.getOwner().getLocation() != null) {
             studio.setLocation(studio.getOwner().getLocation());
         }
-        if (request.getPricing() != null) studio.setPricing(request.getPricing());
-        if (request.getProductionPackagePrice() != null) studio.setProductionPackagePrice(request.getProductionPackagePrice());
+        if (request.getProductionPackagePrice() != null) {
+            studio.setProductionPackagePrice(request.getProductionPackagePrice());
+            studio.setPricing(request.getProductionPackagePrice());
+        }
         if (request.getAvailability() != null) studio.setAvailability(request.getAvailability());
         if (request.getDescription() != null) studio.setDescription(request.getDescription());
         if (request.getBadge() != null) studio.setBadge(request.getBadge());
@@ -168,8 +170,8 @@ public class StudioServiceImpl {
                     .catalogServiceId(item.getCatalogServiceId() != null
                             ? item.getCatalogServiceId() : resolveCatalogServiceId(item.getName()))
                     .active(item.isActive())
-                    .includedInProductionPackage(item.isIncludedInProductionPackage())
-                    .price(item.isIncludedInProductionPackage() ? null : item.getPrice())
+                    .includedInProductionPackage(true)
+                    .price(null)
                     .studioId(studio.getId()).studio(studio).build()).toList();
         }
 
@@ -195,14 +197,9 @@ public class StudioServiceImpl {
             throw StudioosException.badRequest("Set a full-production package price before publishing services");
         }
         if (details == null) return;
-        boolean hasPackageStage = details.stream().anyMatch(item -> item.isIncludedInProductionPackage() && item.isActive());
-        if (!hasPackageStage) {
-            throw StudioosException.badRequest("Keep at least one production stage in the package");
-        }
-        boolean hasUnpricedAddon = details.stream().anyMatch(item -> item.isActive()
-                && !item.isIncludedInProductionPackage() && (item.getPrice() == null || item.getPrice() < 1));
-        if (hasUnpricedAddon) {
-            throw StudioosException.badRequest("Set a separate price for each active add-on service");
+        boolean hasIncludedService = details.stream().anyMatch(StudioServiceOfferingRequest::isActive);
+        if (!hasIncludedService) {
+            throw StudioosException.badRequest("Keep at least one active service in the production package");
         }
     }
 
@@ -438,7 +435,7 @@ public class StudioServiceImpl {
                 .location(studio.getOwner() != null && studio.getOwner().getLocation() != null
                         ? studio.getOwner().getLocation()
                         : studio.getLocation())
-                .pricing(studio.getPricing())
+                .pricing(studio.getProductionPackagePrice() != null ? studio.getProductionPackagePrice() : 0)
                 .productionPackagePrice(studio.getProductionPackagePrice())
                 .availability(studio.getAvailability())
                 .description(studio.getDescription())
@@ -469,7 +466,7 @@ public class StudioServiceImpl {
                 .serviceDetails(studio.getServices().stream().map(s -> StudioServiceOfferingResponse.builder()
                         .id(s.getId()).name(s.getName()).catalogServiceId(s.getCatalogServiceId())
                         .active(s.isActive())
-                        .includedInProductionPackage(s.isIncludedInProductionPackage()).price(s.getPrice()).build())
+                        .includedInProductionPackage(true).price(null).build())
                         .collect(Collectors.toList()))
                 .media(studioMediaService.getMedia(studio.getId()))
                 .averageRating(avgRating)

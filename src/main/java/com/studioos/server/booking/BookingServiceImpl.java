@@ -59,6 +59,10 @@ public class BookingServiceImpl {
         if (!studio.isAvailable()) {
             throw StudioosException.badRequest("This studio is not currently accepting bookings");
         }
+        Integer packagePrice = studio.getProductionPackagePrice();
+        if (packagePrice == null || packagePrice < 1) {
+            throw StudioosException.conflict("This studio has not set a production package price");
+        }
         if (!request.getSessionDate().isAfter(LocalDateTime.now())) {
             throw StudioosException.badRequest("Session date must be in the future");
         }
@@ -94,7 +98,7 @@ public class BookingServiceImpl {
             Booking retry = expiredMatches.get(0);
             retry.setStatus(BookingStatus.PENDING);
             retry.setAttemptCount(retry.getAttemptCount() + 1);
-            retry.setTotalPrice(null);
+            retry.setTotalPrice(packagePrice);
             retry.setNotes(request.getNotes());
             bookingRepository.save(retry);
             applicationEventPublisher.publishEvent(BookingCreatedEvent.builder()
@@ -112,6 +116,7 @@ public class BookingServiceImpl {
                 .durationHours(request.getDurationHours())
                 .attemptCount(1)
                 .notes(request.getNotes())
+                .totalPrice(packagePrice)
                 .status(BookingStatus.PENDING)
                 .paymentStatus(BookingPaymentStatus.BOOKED)
                 .build();
@@ -153,6 +158,10 @@ public class BookingServiceImpl {
         if (!studio.isAvailable()) {
             throw StudioosException.badRequest("This studio is not currently accepting bookings");
         }
+        Integer currentPackagePrice = studio.getProductionPackagePrice();
+        if (currentPackagePrice == null || currentPackagePrice < 1) {
+            throw StudioosException.conflict("This studio has not set a production package price");
+        }
 
         LocalDateTime endDate = request.getSessionDate().plusHours(request.getDurationHours());
         boolean conflicts = bookingRepository.findConflictingBookings(booking.getStudioId(), request.getSessionDate(), endDate)
@@ -168,7 +177,7 @@ public class BookingServiceImpl {
         if (isRetry) {
             booking.setAttemptCount(booking.getAttemptCount() + 1);
             booking.setStatus(BookingStatus.PENDING);
-            booking.setTotalPrice(null);
+            booking.setTotalPrice(currentPackagePrice);
         }
         bookingRepository.save(booking);
         if (isRetry) {
@@ -211,8 +220,14 @@ public class BookingServiceImpl {
             throw StudioosException.badRequest("The requested session time has already passed");
         }
 
+        Integer packagePrice = booking.getTotalPrice() != null
+                ? booking.getTotalPrice() : studio.getProductionPackagePrice();
+        if (packagePrice == null || packagePrice < 1) {
+            throw StudioosException.conflict("Set a valid production package price before approving bookings");
+        }
+
         booking.setStatus(BookingStatus.APPROVED);
-        booking.setTotalPrice(request.getTotalPrice());
+        booking.setTotalPrice(packagePrice);
         bookingRepository.save(booking);
         log.info("Booking confirmed: {}", bookingId);
 
@@ -332,6 +347,8 @@ public class BookingServiceImpl {
                 .sessionDate(booking.getSessionDate())
                 .durationHours(booking.getDurationHours())
                 .attemptCount(booking.getAttemptCount())
+                .productionPackagePrice(booking.getTotalPrice() != null ? booking.getTotalPrice()
+                        : studio != null ? studio.getProductionPackagePrice() : null)
                 .totalPrice(booking.getTotalPrice())
                 .status(booking.getStatus())
                 .paymentStatus(booking.getPaymentStatus())

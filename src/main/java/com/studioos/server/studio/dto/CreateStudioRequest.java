@@ -16,7 +16,6 @@ public class CreateStudioRequest {
     @NotBlank(message = "Location is required")
     private String location;
 
-    @NotNull(message = "Pricing is required")
     private Integer pricing;
     @NotNull(message = "Full-production package price is required")
     @Positive(message = "Full-production package price must be greater than zero")
